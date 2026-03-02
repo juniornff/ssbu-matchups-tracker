@@ -8,3 +8,4 @@ services:
     volumes:
       - .:/app
       - ./instance:/app/instance
+      - ./pass.txt:/app/pass.txt
