@@ -74,9 +74,9 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 If you prefer to use Docker for execution:
 
-    ```bash
-    docker-compose up -d
-    ```
+```bash
+docker compose up -d
+```
 
 ## License
 
