@@ -1,0 +1,10 @@
+services:
+  ssbu_matchups:
+    image: ghcr.io/juniornff/ssbu-matchups-tracker:latest
+    container_name: Ssbu_Matchups
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./instance:/app/instance
+      - ./pass.txt:/app/pass.txt
