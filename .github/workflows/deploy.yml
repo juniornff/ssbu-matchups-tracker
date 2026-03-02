@@ -59,7 +59,7 @@ jobs:
 
             # Esperar unos segundos y verificar que el contenedor está corriendo
             sleep 5
-            if [ -z "$(docker-compose ps -q)" ]; then
+            if [ -z "$(docker compose ps -q)" ]; then
               echo "Error: el contenedor no se inició correctamente"
               exit 1
             fi
