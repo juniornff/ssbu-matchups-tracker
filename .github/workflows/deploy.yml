@@ -42,11 +42,30 @@ jobs:
           script: |
             set -e
             cd ~/Applications/ssbu_matchups
-            OLD_IMAGE=$(docker images --filter=reference='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest' --format '{{.ID}}')
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker-compose down
+
+            # Si no existe docker-compose.yml, usar el de producción
+            if [ ! -f docker-compose.yml ]; then
+              cp docker-compose.prod.yml docker-compose.yml
+            fi
+
+            # Descargar la última imagen
+            docker pull ghcr.io/juniornff/ssbu-matchups-tracker:latest
+
+            # Detener contenedor anterior (si existe)
+            docker-compose down || true
+
+            # Levantar nuevo contenedor
             docker-compose up -d
-            NEW_IMAGE=$(docker images --filter=reference='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest' --format '{{.ID}}')
-            if [ -n "$OLD_IMAGE" ] && [ "$OLD_IMAGE" != "$NEW_IMAGE" ]; then
-                docker rmi "$OLD_IMAGE"
+
+            # Esperar unos segundos y verificar que el contenedor está corriendo
+            sleep 5
+            if [ -z "$(docker-compose ps -q)" ]; then
+              echo "Error: el contenedor no se inició correctamente"
+              exit 1
+            fi
+
+            # Eliminar la imagen anterior si existe y es diferente
+            OLD_IMAGE=$(docker images --filter=reference='ghcr.io/juniornff/ssbu-matchups-tracker:latest' --format '{{.ID}}' | tail -n +2 | head -1)
+            if [ -n "$OLD_IMAGE" ]; then
+              docker rmi "$OLD_IMAGE" || true
             fi
