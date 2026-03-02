@@ -1,0 +1,49 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# Base de datos SQLite
+*.sqlite
+*.sqlite3
+
+# Control de versiones
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# IDE y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs y archivos temporales
+*.log
+*.pid
+*.pid.lock
+*.pot
+*.mo
+*.so
+*.egg
+wheels/
+
+# Documentación y configuración local
+README.md
+
+# Otros
+LICENSE
+README.md
