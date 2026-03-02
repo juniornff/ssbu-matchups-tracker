@@ -52,10 +52,10 @@ jobs:
             docker pull ghcr.io/juniornff/ssbu-matchups-tracker:latest
 
             # Detener contenedor anterior (si existe)
-            docker-compose down || true
+            docker compose down || true
 
             # Levantar nuevo contenedor
-            docker-compose up -d
+            docker compose up -d
 
             # Esperar unos segundos y verificar que el contenedor está corriendo
             sleep 5
