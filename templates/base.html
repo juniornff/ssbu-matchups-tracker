@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smash Ultimate Tournaments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <!-- CSS que se cargará dinámicamente -->
+    <link rel="stylesheet" id="bootstrap-css">
+    <link rel="stylesheet" id="bootstrap-icons-css">
+    <link rel="stylesheet" id="tom-select-css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container bg-dark">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Smash Ultimate</a>
+
+            <!-- Botón hamburguesa para móviles -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav" aria-controls="navbarNav"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Contenido del menú -->
+            <div class="collapse navbar-collapse navbar-dark bg-dark" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_participantes') }}">Participantes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_personajes') }}">Personajes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_eventos') }}">Eventos</a>
+                    </li>
+                    {% if ronda_actual_id %}
+                    <li class="nav-item">
+                        <a class="nav-link text-warning" href="{{ url_for('gestion_matchups', ronda_id=ronda_actual_id) }}">
+                            🎮 Matches Actuales
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('mostrar_estadisticas') }}">Estadísticas</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Scripts que se cargarán dinámicamente -->
+    <script id="bootstrap-js"></script>
+    <script id="tom-select-js"></script>
+
+    <script>
+        // Configuración de URLs
+        const config = {
+            cdn: {
+                bootstrap: {
+                    css: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+                    js: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'
+                },
+                icons: {
+                    css: 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css'
+                },
+                tomSelect: {
+                    css: 'https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.css',
+                    js: 'https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js'
+                }
+            },
+            local: {
+                bootstrap: {
+                    css: '/static/bootstrap-5.3.8/css/bootstrap.min.css',
+                    js: '/static/bootstrap-5.3.8/js/bootstrap.bundle.min.js'
+                },
+                icons: {
+                    css: '/static/bootstrap-icons-1.13.1/package/font/bootstrap-icons.css'
+                },
+                tomSelect: {
+                    css: '/static/tom-select-2.4.3/package/dist/css/tom-select.bootstrap5.css',
+                    js: '/static/tom-select-2.4.3/package/dist/js/tom-select.complete.min.js'
+                }
+            }
+        };
+
+        // Variable global para saber cuando Tom Select está listo
+        window.tomSelectReady = false;
+        window.tomSelectCallbacks = [];
+
+        // Función para ejecutar cuando Tom Select esté listo
+        function onTomSelectReady(callback) {
+            if (window.tomSelectReady) {
+                callback();
+            } else {
+                window.tomSelectCallbacks.push(callback);
+            }
+        }
+
+        // Función para cargar un recurso con fallback
+        function loadResourceWithFallback(resourceType, resourceId, cdnUrl, localUrl, onSuccess, onError) {
+            if (resourceType === 'css') {
+                const link = document.getElementById(resourceId);
+                link.href = cdnUrl;
+                link.onload = onSuccess;
+                link.onerror = function() {
+                    console.warn(`CDN falló para ${resourceId}, cargando local...`);
+                    link.href = localUrl;
+                    onSuccess();
+                };
+            } else if (resourceType === 'js') {
+                const script = document.getElementById(resourceId);
+                script.src = cdnUrl;
+                script.onload = onSuccess;
+                script.onerror = function() {
+                    console.warn(`CDN falló para ${resourceId}, cargando local...`);
+                    script.src = localUrl;
+                    onSuccess();
+                };
+            }
+        }
+
+        // Función para verificar si Bootstrap se cargó correctamente
+        function checkBootstrapLoaded() {
+            return typeof bootstrap !== 'undefined' &&
+                   document.querySelector('.navbar-toggler') !== null;
+        }
+
+        // Función para verificar si Tom Select se cargó correctamente
+        function checkTomSelectLoaded() {
+            return typeof TomSelect !== 'undefined';
+        }
+
+        // Función para marcar Tom Select como listo y ejecutar callbacks
+        function setTomSelectReady() {
+            window.tomSelectReady = true;
+            window.tomSelectCallbacks.forEach(callback => {
+                try {
+                    callback();
+                } catch (e) {
+                    console.error('Error en callback de Tom Select:', e);
+                }
+            });
+            window.tomSelectCallbacks = [];
+        }
+
+        // Cargar todos los recursos
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargar CSS
+            loadResourceWithFallback('css', 'bootstrap-css',
+                config.cdn.bootstrap.css, config.local.bootstrap.css,
+                function() {
+                    console.log('Bootstrap CSS cargado');
+                });
+
+            loadResourceWithFallback('css', 'bootstrap-icons-css',
+                config.cdn.icons.css, config.local.icons.css,
+                function() {
+                    console.log('Bootstrap Icons CSS cargado');
+                });
+
+            loadResourceWithFallback('css', 'tom-select-css',
+                config.cdn.tomSelect.css, config.local.tomSelect.css,
+                function() {
+                    console.log('Tom Select CSS cargado');
+                });
+
+            // Cargar JavaScript - Bootstrap primero
+            loadResourceWithFallback('js', 'bootstrap-js',
+                config.cdn.bootstrap.js, config.local.bootstrap.js,
+                function() {
+                    console.log('Bootstrap JS cargado');
+
+                    // Verificar si Bootstrap se cargó correctamente
+                    setTimeout(() => {
+                        if (!checkBootstrapLoaded()) {
+                            console.error('Bootstrap no se cargó correctamente, recargando local...');
+                            const script = document.getElementById('bootstrap-js');
+                            script.src = config.local.bootstrap.js;
+                        }
+                    }, 1000);
+                });
+
+            // Cargar Tom Select después de Bootstrap
+            setTimeout(() => {
+                loadResourceWithFallback('js', 'tom-select-js',
+                    config.cdn.tomSelect.js, config.local.tomSelect.js,
+                    function() {
+                        console.log('Tom Select JS cargado');
+
+                        // Verificar si Tom Select se cargó correctamente
+                        const checkTomSelect = () => {
+                            if (checkTomSelectLoaded()) {
+                                console.log('Tom Select está listo');
+                                setTomSelectReady();
+                            } else {
+                                console.warn('Tom Select aún no está disponible, reintentando...');
+                                setTimeout(checkTomSelect, 100);
+                            }
+                        };
+
+                        checkTomSelect();
+
+                        // Fallback si Tom Select no se carga después de 5 segundos
+                        setTimeout(() => {
+                            if (!window.tomSelectReady) {
+                                console.error('Tom Select no se cargó, forzando recarga local...');
+                                const script = document.getElementById('tom-select-js');
+                                script.src = config.local.tomSelect.js;
+
+                                // Verificar nuevamente después de recargar
+                                setTimeout(checkTomSelect, 500);
+                            }
+                        }, 5000);
+                    });
+            }, 500); // Pequeño delay para asegurar que Bootstrap cargue primero
+        });
+
+        // Fallback adicional: si después de 5 segundos la página no se ve bien, forzar recarga con recursos locales
+        setTimeout(function() {
+            const navbarToggler = document.querySelector('.navbar-toggler');
+            if (navbarToggler && !navbarToggler.getAttribute('data-bs-toggle')) {
+                console.warn('La página no se renderizó correctamente, forzando recarga con recursos locales...');
+
+                document.getElementById('bootstrap-css').href = config.local.bootstrap.css;
+                document.getElementById('bootstrap-icons-css').href = config.local.icons.css;
+                document.getElementById('tom-select-css').href = config.local.tomSelect.css;
+                document.getElementById('bootstrap-js').src = config.local.bootstrap.js;
+                document.getElementById('tom-select-js').src = config.local.tomSelect.js;
+
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            }
+        }, 5000);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,10 @@
+services:
+  ssbu_matchups:
+    build: .
+    container_name: Ssbu_Matchups
+    restart: 'unless-stopped'
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - ./instance:/app/instance

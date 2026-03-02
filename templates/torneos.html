@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Torneos para Evento: {{ evento.fecha }}</h2>
+<hr>
+
+<!-- Modal Editar Torneo -->
+<div class="modal fade" id="editarTorneoModal" tabindex="-1" aria-labelledby="editarTorneoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarRondaModalLabel">Editar Torneo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="" id="formEditarTorneo">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nombreTorneo" class="form-label">Nuevo nombre del torneo</label>
+            <input type="text" class="form-control" id="nombreTorneo" name="nombre" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Eliminar Ronda -->
+<div class="modal fade" id="eliminarRondaModal" tabindex="-1" aria-labelledby="eliminarTorneoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eliminarRondaModalLabel">Eliminar Torneo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que quieres eliminar este Torneo? Se eliminarán todos los matches asociados.</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formEliminarTorneo" method="POST" action="">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formEliminarRonda" class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Crear Nueva Torneo</h3>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre del Torneo</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear Torneo</button>
+            <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Torneo Registrados</h3>
+        {% if evento.torneos %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for torneo in evento.torneos %}
+                    <tr>
+                        <td>{{ torneo.nombre }}</td>
+                        <td>
+                            <a href="{{ url_for('gestion_brackets') }}" class="btn btn-sm btn-warning">Brackets 👑</a>
+
+                            <!-- Botón Editar -->
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal" data-bs-target="#editarTorneoModal"
+                                    data-id="{{ ronda.id }}" data-nombre="{{ torneo.nombre }}">
+                                ✏️
+                            </button>
+
+                            <!-- Botón Eliminar -->
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#eliminarTorneoModal"
+                                    data-id="{{ ronda.id }}">
+                                ❌
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            No hay torneos registrados para este evento.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Script para el modal de editar ronda
+    document.getElementById('editarTorneoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var nombre = button.getAttribute('data-nombre');
+        var form = document.getElementById('formEditarTorneo');
+        form.action = "{{ url_for('editar_torneo', id=0) }}".replace('0', id);
+        document.getElementById('nombreTorneo').value = nombre;
+    });
+
+    // Script para el modal de eliminar ronda
+    document.getElementById('eliminarTorneoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var form = document.getElementById('formEliminarTorneo');
+        form.action = "{{ url_for('eliminar_torneo', id=0) }}".replace('0', id);
+    });
+</script>
+{% endblock %}

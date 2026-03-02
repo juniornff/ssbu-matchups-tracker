@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Gestión de Personajes</h2>
+<hr>
+
+<!-- Modal Eliminar Personaje -->
+<div class="modal fade" id="eliminarPersonajeModal" tabindex="-1" aria-labelledby="eliminarPersonajeModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eliminarPersonajeModalLabel">Eliminar Personaje</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que deseas eliminar este personaje? Esta acción no se puede deshacer.</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formEliminarPersonaje" method="POST" action="">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formEliminarPersonaje" class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Personaje -->
+<div class="modal fade" id="editarPersonajeModal" tabindex="-1" aria-labelledby="editarPersonajeModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarPersonajeModalLabel">Editar Personaje</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="formEditarPersonaje" method="POST" action="">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nombrePersonaje" class="form-label">Nuevo nombre</label>
+            <input type="text" class="form-control" id="nombrePersonaje" name="nombre" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Añadir Personaje</h3>
+        <form method="POST" action="{{ url_for('gestion_personajes') }}">
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre del Personaje</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" required>
+            </div>
+            <button type="submit" class="btn btn-primary">➕ Añadir</button>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Lista de Personajes</h3>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for personaje in personajes %}
+                    <tr>
+                        <td>{{ personaje.nombre }}</td>
+                        <td>
+                            <!-- Botón Editar -->
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    data-bs-toggle="modal" data-bs-target="#editarPersonajeModal"
+                                    data-id="{{ personaje.id }}" data-nombre="{{ personaje.nombre }}">
+                                ✏️
+                            </button>
+                            <!-- Botón Eliminar -->
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#eliminarPersonajeModal"
+                                    data-id="{{ personaje.id }}">
+                                ❌
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Script para el modal de editar personaje
+    document.getElementById('editarPersonajeModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var nombre = button.getAttribute('data-nombre');
+        var form = document.getElementById('formEditarPersonaje');
+        form.action = "{{ url_for('editar_personaje', id=0) }}".replace('0', id);
+        document.getElementById('nombrePersonaje').value = nombre;
+    });
+
+    // Script para el modal de eliminar personaje
+    document.getElementById('eliminarPersonajeModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var form = document.getElementById('formEliminarPersonaje');
+        form.action = "{{ url_for('eliminar_personaje', id=0) }}".replace('0', id);
+    });
+</script>
+{% endblock %}

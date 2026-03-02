@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smash Ultimate Tournaments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-5.3.8/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap-icons-1.13.1/package/font/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='tom-select-2.4.3/package/dist/css/tom-select.bootstrap5.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container bg-dark">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Smash Ultimate</a>
+
+            <!-- Botón hamburguesa para móviles -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav" aria-controls="navbarNav"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Contenido del menú -->
+            <div class="collapse navbar-collapse navbar-dark bg-dark" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_participantes') }}">Participantes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_personajes') }}">Personajes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('gestion_eventos') }}">Eventos</a>
+                    </li>
+                    {% if ronda_actual_id %}
+                    <li class="nav-item">
+                        <a class="nav-link text-warning" href="{{ url_for('gestion_matchups', ronda_id=ronda_actual_id) }}">
+                            🎮 Matches Actuales
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('mostrar_estadisticas') }}">Estadísticas</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='bootstrap-5.3.8/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='tom-select-2.4.3/package/dist/js/tom-select.complete.min.js') }}"></script>
+</body>
+</html>

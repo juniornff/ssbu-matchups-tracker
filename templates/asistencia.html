@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Asistencia para Evento: {{ evento.fecha }}</h2>
+<hr>
+
+<form method="POST">
+    <div class="mb-4">
+        <h4>Selecciona los participantes presentes:</h4>
+        <div class="row">
+            {% for participante in participantes %}
+            <div class="col-md-4 mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="asistentes" value="{{ participante.id }}"
+                           id="a{{ participante.id }}" {% if participante.id in asistentes_ids %}checked{% endif %} {% if not participante.activo %}disabled{% endif %}>
+                    <label class="form-check-label" for="a{{ participante.id }}">
+                        {{ participante.nickname }}
+                        {% if not participante.activo %}<span class="text-muted"> (Retirado)</span>{% endif %}
+                    </label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Guardar Asistencia</button>
+    <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
+</form>
+{% endblock %}

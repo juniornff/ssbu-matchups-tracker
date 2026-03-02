@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-4">Bienvenidos Charles Family SSB League </h1>
+    <p class="lead">Organiza y registra tus encuentros de Super Smash Bros Ultimate</p>
+    <hr class="my-4">
+
+    <!-- Tarjeta Matches Actuales -->
+    {% if ronda_actual_id %}
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Matches Actuales</h5>
+                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#configurarRondaModal">
+                        ⚙️
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Accede rápidamente a los matches de la ronda actual</p>
+                    <a href="{{ url_for('gestion_matchups', ronda_id=ronda_actual_id) }}" class="btn btn-primary">
+                        Ir a Matches
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row mt-5">
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Participantes</h5>
+                    <p class="card-text">Registra jugadores y sus personajes</p>
+                    <a href="{{ url_for('gestion_participantes') }}" class="btn btn-primary">Gestionar</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Personajes</h5>
+                    <p class="card-text">Gestiona los personajes disponibles</p>
+                    <a href="{{ url_for('gestion_personajes') }}" class="btn btn-primary">Gestionar</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Eventos</h5>
+                    <p class="card-text">Crea eventos y registra asistencias</p>
+                    <a href="{{ url_for('gestion_eventos') }}" class="btn btn-primary">Gestionar</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Estadísticas</h5>
+                    <p class="card-text">Consulta winrates y resultados</p>
+                    <a href="{{ url_for('mostrar_estadisticas') }}" class="btn btn-primary">Ver</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para configurar la ronda actual -->
+<div class="modal fade" id="configurarRondaModal" tabindex="-1" aria-labelledby="configurarRondaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="configurarRondaModalLabel">Configurar Ronda Actual</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('configurar_ronda_actual') }}">
+        <div class="modal-body">
+          <p>Selecciona la ronda que quieres establecer como actual:</p>
+
+          <div class="mb-3">
+            <label for="rondaSelect" class="form-label">Rondas Disponibles</label>
+            <select class="form-select" id="rondaSelect" name="ronda_id" required>
+              <option value="">Selecciona una ronda</option>
+              {% for evento in eventos %}
+                <optgroup label="Evento: {{ evento.fecha }}">
+                  {% for ronda in evento.rondas %}
+                    <option value="{{ ronda.id }}" {% if ronda.id == ronda_actual_id %}selected{% endif %}>
+                      {{ ronda.nombre }} (Evento: {{ evento.fecha }})
+                    </option>
+                  {% endfor %}
+                </optgroup>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="codigoSecreto" class="form-label">Código Secreto</label>
+            <input type="password" class="form-control" id="codigoSecreto" name="codigo_secreto" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

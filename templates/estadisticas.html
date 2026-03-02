@@ -1,0 +1,374 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Estadísticas de los Participantes</h2>
+<hr>
+
+{% if mensaje %}
+<div class="alert alert-info">
+    {{ mensaje }}
+</div>
+{% else %}
+<ul class="nav nav-tabs mb-4" id="statsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="general-tab" data-bs-toggle="tab"
+                data-bs-target="#general" type="button" role="tab">General</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="characters-tab" data-bs-toggle="tab"
+                data-bs-target="#characters" type="button" role="tab">Por Personaje</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="opponents-tab" data-bs-toggle="tab"
+                data-bs-target="#opponents" type="button" role="tab">Contra Oponentes</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="statsTabsContent">
+    <!-- Pestaña General -->
+    <div class="tab-pane fade show active" id="general" role="tabpanel">
+        <h3>Winrate General</h3>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Participante</th>
+                        <th>Tipo</th>
+                        <th>Ganados</th>
+                        <th>Jugados</th>
+                        <th>Winrate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for participante in participantes %}
+                    {% set p_stats = stats['partidos']['general'].get(participante.id, {}) %}
+                    {% set r_stats = stats['rondas']['general'].get(participante.id, {}) %}
+                    <tr>
+                        <td rowspan="2">
+                            <a href="{{ url_for('historial_participante', id=participante.id) }}">
+                                {{ participante.nickname }}
+                            </a>
+                            {% if not participante.activo %}<span class="text-muted"> (Retirado)</span>{% endif %}
+                        </td>
+                        <td>Partidos</td>
+                        <td>{{ p_stats.get('ganados', 0) }}</td>
+                        <td>{{ p_stats.get('jugados', 0) }}</td>
+                        <td>
+                            {% set jugados = p_stats.get('jugados', 0) %}
+                            {% if jugados > 0 %}
+                                {{ p_stats.get('winrate', 0)|round(2) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Rondas</td>
+                        <td>{{ r_stats.get('ganadas', 0) }}</td>
+                        <td>{{ r_stats.get('jugadas', 0) }}</td>
+                        <td>
+                            {% set jugadas = r_stats.get('jugadas', 0) %}
+                            {% if jugadas > 0 %}
+                                {{ r_stats.get('winrate', 0)|round(2) }}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- /Pestaña General -->
+
+    <!-- Pestaña Por Personaje -->
+    <div class="tab-pane fade" id="characters" role="tabpanel">
+        <h3>Winrate por Personaje</h3>
+        <div class="accordion" id="accordionCharacters">
+            {% for participante in participantes %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingCharacters{{ participante.id }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapseCharacters{{ participante.id }}" aria-expanded="false"
+                            aria-controls="collapseCharacters{{ participante.id }}">
+                        <span class="participant-name" data-participant-id="{{ participante.id }}"
+                              style="cursor: pointer; font-weight: bold; margin-right: 8px;">
+                            {{ participante.nickname }}
+                        </span>
+                        {% if not participante.activo %}<span class="text-muted ms-2"> (Retirado)</span>{% endif %}
+                        <span class="badge bg-primary ms-2">{{ participante.personajes|length }} personajes</span>
+                    </button>
+                </h2>
+                <div id="collapseCharacters{{ participante.id }}" class="accordion-collapse collapse"
+                    aria-labelledby="headingCharacters{{ participante.id }}" data-bs-parent=""> <!-- Eliminamos data-bs-parent -->
+                    <div class="accordion-body">
+                        {% if participante.personajes %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Personaje</th>
+                                        <th>Tipo</th>
+                                        <th>Ganados</th>
+                                        <th>Jugados</th>
+                                        <th>Winrate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for personaje in participante.personajes %}
+                                    {% set p_stats = stats['partidos']['por_personaje'][participante.id].get(personaje.id, {}) %}
+                                    {% set pp_stats = stats['partidos']['por_personaje_parcial'][participante.id].get(personaje.id, {}) %}
+                                    {% set r_stats = stats['rondas']['por_personaje'][participante.id].get(personaje.id, {}) %}
+                                    <tr>
+                                        <td rowspan="3">{{ personaje.nombre }}</td>
+                                        <td>Partidos</td>
+                                        <td>{{ p_stats.get('ganados', 0) }}</td>
+                                        <td>{{ p_stats.get('jugados', 0) }}</td>
+                                        <td>
+                                            {% set jugados = p_stats.get('jugados', 0) %}
+                                            {% if jugados > 0 %}
+                                                {{ p_stats.get('winrate', 0)|round(2) }}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Partidos(Parcial)</td>
+                                        <td>{{ pp_stats.get('ganados', 0) }}</td>
+                                        <td>{{ pp_stats.get('jugados', 0) }}</td>
+                                        <td>
+                                            {% set jugados_parcial = pp_stats.get('jugados', 0) %}
+                                            {% if jugados_parcial > 0 %}
+                                                {{ pp_stats.get('winrate', 0)|round(2) }}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Rondas</td>
+                                        <td>{{ r_stats.get('ganadas', 0) }}</td>
+                                        <td>{{ r_stats.get('jugadas', 0) }}</td>
+                                        <td>
+                                            {% set jugadas = r_stats.get('jugadas', 0) %}
+                                            {% if jugadas > 0 %}
+                                                {{ r_stats.get('winrate', 0)|round(2) }}%
+                                            {% else %}
+                                                0%
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No hay personajes registrados</p>
+        {% endif %}
+    </div>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+<!-- /Pestaña Por Personaje -->
+
+<!-- Pestaña Contra Oponentes -->
+<div class="tab-pane fade" id="opponents" role="tabpanel">
+    <h3>Winrate contra Oponentes</h3>
+    <div class="accordion" id="accordionOpponents">
+        {% for participante in participantes %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingOpponents{{ participante.id }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseOpponents{{ participante.id }}" aria-expanded="false"
+                        aria-controls="collapseOpponents{{ participante.id }}">
+                    <span class="participant-name" data-participant-id="{{ participante.id }}"
+                          style="cursor: pointer; font-weight: bold; margin-right: 8px;">
+                        {{ participante.nickname }}
+                    </span>
+                    {% if not participante.activo %}<span class="text-muted ms-2"> (Retirado)</span>{% endif %}
+                    <span class="badge bg-primary ms-2">{{ participantes|length - 1 }} oponentes</span>
+                </button>
+            </h2>
+            <div id="collapseOpponents{{ participante.id }}" class="accordion-collapse collapse"
+                aria-labelledby="headingOpponents{{ participante.id }}" data-bs-parent=""> <!-- Eliminamos data-bs-parent -->
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Oponente</th>
+                                    <th>Tipo</th>
+                                    <th>Ganados</th>
+                                    <th>Jugados</th>
+                                    <th>Winrate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for oponente in participantes %}
+                                {% if oponente.id != participante.id %}
+                                {% set p_stats = stats['partidos']['contra_oponente'][participante.id].get(oponente.id, {}) %}
+                                {% set r_stats = stats['rondas']['contra_oponente'][participante.id].get(oponente.id, {}) %}
+                                <tr>
+                                    <td rowspan="2">
+                                        <span class="participant-name" data-participant-id="{{ oponente.id }}"
+                                              style="cursor: pointer; font-weight: bold;">
+                                            {{ oponente.nickname }}
+                                        </span>
+                                        {% if not oponente.activo %}<span class="text-muted"> (Retirado)</span>{% endif %}
+                                    </td>
+                                    <td>Partidos</td>
+                                    <td>{{ p_stats.get('ganados', 0) }}</td>
+                                    <td>{{ p_stats.get('jugados', 0) }}</td>
+                                    <td>
+                                        {% set jugados = p_stats.get('jugados', 0) %}
+                                        {% if jugados > 0 %}
+                                            {{ p_stats.get('winrate', 0)|round(2) }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Rondas</td>
+                                    <td>{{ r_stats.get('ganadas', 0) }}</td>
+                                    <td>{{ r_stats.get('jugadas', 0) }}</td>
+                                    <td>
+                                        {% set jugadas = r_stats.get('jugadas', 0) %}
+                                        {% if jugadas > 0 %}
+                                            {{ r_stats.get('winrate', 0)|round(2) }}%
+                                        {% else %}
+                                            0%
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<!-- Pestaña Contra Oponentes -->
+
+</div>
+{% endif %}
+
+<style>
+.accordion-button:not(.collapsed) {
+    background-color: #e7f1ff;
+    color: #0c63e4;
+}
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(0,0,0,.125);
+}
+
+/* Estilos para los nombres clickeables */
+.participant-name {
+    transition: color 0.2s ease-in-out;
+    color: inherit;
+}
+
+.participant-name:hover {
+    color: #0d6efd !important;
+    text-decoration: underline;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Función para redirigir al historial del participante
+function redirectToHistory(participantId) {
+    window.location.href = `/historial/${participantId}`;
+}
+
+// Función para expandir/colapsar todos los acordeones
+function toggleAllAccordions(expand) {
+    const accordions = document.querySelectorAll('.accordion-collapse');
+    accordions.forEach(accordion => {
+        if (expand) {
+            accordion.classList.remove('collapse');
+            accordion.classList.add('show');
+        } else {
+            accordion.classList.remove('show');
+            accordion.classList.add('collapse');
+        }
+
+        // Actualizar el estado del botón correspondiente
+        const button = document.querySelector(`[data-bs-target="#${accordion.id}"]`);
+        if (button) {
+            if (expand) {
+                button.classList.remove('collapsed');
+                button.setAttribute('aria-expanded', 'true');
+            } else {
+                button.classList.add('collapsed');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        }
+    });
+}
+
+// Inicialización cuando el DOM está listo
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar event listeners a todos los nombres de participantes
+    const participantNames = document.querySelectorAll('.participant-name');
+    participantNames.forEach(nameElement => {
+        nameElement.addEventListener('click', function(e) {
+            // Prevenir que el evento se propague al botón del acordeón
+            e.stopPropagation();
+
+            const participantId = this.getAttribute('data-participant-id');
+            if (participantId) {
+                redirectToHistory(participantId);
+            }
+        });
+    });
+
+    // Añadir botones para expandir/colapsar todos
+    const charactersTab = document.getElementById('characters');
+    if (charactersTab) {
+        const charactersHeader = charactersTab.querySelector('h3');
+        if (charactersHeader) {
+            const charactersButtons = document.createElement('div');
+            charactersButtons.className = 'btn-group btn-group-sm float-end';
+            charactersButtons.innerHTML = `
+                <button type="button" class="btn btn-outline-primary" onclick="toggleAllAccordions(true)">Expandir Todos</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="toggleAllAccordions(false)">Colapsar Todos</button>
+            `;
+            charactersHeader.appendChild(charactersButtons);
+        }
+    }
+
+    const opponentsTab = document.getElementById('opponents');
+    if (opponentsTab) {
+        const opponentsHeader = opponentsTab.querySelector('h3');
+        if (opponentsHeader) {
+            const opponentsButtons = document.createElement('div');
+            opponentsButtons.className = 'btn-group btn-group-sm float-end';
+            opponentsButtons.innerHTML = `
+                <button type="button" class="btn btn-outline-primary" onclick="toggleAllAccordions(true)">Expandir Todos</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="toggleAllAccordions(false)">Colapsar Todos</button>
+            `;
+            opponentsHeader.appendChild(opponentsButtons);
+        }
+    }
+
+    // Manejar el cambio de pestañas
+    const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabEls.forEach(tabEl => {
+        tabEl.addEventListener('shown.bs.tab', function (event) {
+            toggleAllAccordions(false);
+        });
+    });
+});
+</script>
+{% endblock %}

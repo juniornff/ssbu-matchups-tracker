@@ -1,0 +1,166 @@
+/* Estilos generales */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+h1, h2, h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.table {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Barra de navegación */
+.navbar {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Formularios */
+.form-control, .form-select {
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+/* Tarjetas de estadísticas */
+.card {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    background-color: #3498db;
+    color: white;
+    font-weight: bold;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+/* Badges */
+.badge {
+    font-weight: normal;
+    margin-right: 5px;
+}
+
+/* Matchups */
+.matchup-row {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.vs-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vs-text {
+    font-weight: bold;
+    color: #e74c3c;
+    margin: 0 15px;
+}
+
+.result-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.result-inputs input {
+    width: 60px;
+    text-align: center;
+}
+
+/* Pestañas */
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+    border-bottom: 3px solid #3498db;
+}
+
+/* Alertas */
+.alert {
+    border-radius: 6px;
+}
+
+/* Estilos responsive para móviles */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }
+
+    h1, h2, h3 {
+        font-size: calc(1.3rem + 0.6vw);
+    }
+
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+
+    .btn {
+        font-size: 0.9rem;
+        padding: 0.375rem 0.75rem;
+    }
+
+    /* Mejorar visualización de cards en móviles */
+    .card-body {
+        padding: 1rem;
+    }
+
+    /* Ajustar espaciado en móviles */
+    .mb-4 {
+        margin-bottom: 1rem !important;
+    }
+
+    /* Mejorar visualización de modales en móviles */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Estilos para pantallas muy pequeñas */
+@media (max-width: 576px) {
+    .container {
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+
+    .nav-link {
+        padding: 0.5rem 0.8rem;
+    }
+}

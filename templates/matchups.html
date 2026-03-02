@@ -1,0 +1,633 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Matchups: {{ ronda.nombre }}</h2>
+<h4>Evento: {{ ronda.evento.fecha }}</h4>
+<hr>
+
+<style>
+  /* Estilos para tamaño fijo de los selects */
+  .personaje-select {
+    min-width: 200px;
+    max-width: 200px;
+  }
+
+  .ts-wrapper.single .ts-control {
+    background-color: #fff;
+    background-image: none;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.75rem;
+  }
+
+  .ts-dropdown {
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+  }
+
+  .ts-dropdown .option {
+    padding: 0.375rem 0.75rem;
+  }
+</style>
+
+<div class="row mb-4">
+    <div class="col-md-5">
+        <select id="jugador1" class="form-select">
+            <option value="">Selecciona un jugador</option>
+            {% for participante in ronda.evento.asistencias %}
+            <option value="{{ participante.participante.id }}"
+                            {% if not participante.participante.activo %}class="text-muted"{% endif %}>
+                {{ participante.participante.nickname }} {% if not participante.participante.activo %}(Retirado){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2 text-center">
+        <span class="vs-text">VS</span>
+    </div>
+    <div class="col-md-5">
+        <select id="jugador2" class="form-select">
+            <option value="">Selecciona un jugador</option>
+            {% for participante in ronda.evento.asistencias %}
+            <option value="{{ participante.participante.id }}"
+                            {% if not participante.participante.activo %}class="text-muted"{% endif %}>
+                {{ participante.participante.nickname }} {% if not participante.participante.activo %}(Retirado){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div id="matchFormContainer" style="display: none;">
+    <form method="POST">
+        <input type="hidden" id="jugador1Id" name="jugador1_id">
+        <input type="hidden" id="jugador2Id" name="jugador2_id">
+
+        <!-- Checkboxes para usar el mismo personaje -->
+        <div class="row mb-3">
+            <div class="col-md-6 d-flex justify-content-start">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mismoPersonajeJ1">
+                    <label class="form-check-label" for="mismoPersonajeJ1">
+                        Usar el mismo personaje
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6 d-flex justify-content-end">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mismoPersonajeJ2">
+                    <label class="form-check-label" for="mismoPersonajeJ2">
+                        Usar el mismo personaje
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón Refrescar -->
+        <div class="text-center mb-3">
+            <button type="button" id="btnRefrescar" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-repeat"></i> Reinciar Selección
+            </button>
+            <!-- Elemento para mostrar el ganador del match -->
+            <div id="ganadorMatchContainer" class="alert alert-info mt-3" style="display: none;">
+                <strong>Ganador del match: </strong><span id="ganadorMatchNombre"></span>
+            </div>
+        </div>
+
+        <!-- Filas para cada ronda (1-5) -->
+        {% for ronda_num in range(1, 6) %}
+        <div class="matchup-row mb-3">
+            <div class="vs-container">
+                <!-- Jugador 1: Personaje (alineado a la izquierda) -->
+                <div class="player-info text-start">
+                    <select class="form-select mb-2 personaje-select personaje-j1-r{{ ronda_num }}"
+                            name="personaje1r{{ ronda_num }}"
+                            id="personaje1r{{ ronda_num }}">
+                        <option value="">Selecciona personaje</option>
+                        <!-- Se llenará dinámicamente -->
+                    </select>
+                </div>
+
+                <!-- Radio buttons para ganador (centrados) -->
+                <div class="vs-text text-center">
+                    <div class="d-flex justify-content-center align-items-center">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input ganador-radio"
+                                    type="radio"
+                                    name="ganador_r{{ ronda_num }}"
+                                    id="ganador_j1_r{{ ronda_num }}"
+                                    data-ronda="{{ ronda_num }}"
+                                    data-jugador="1">
+                            <label class="form-check-label text-primary" for="ganador_j1_r{{ ronda_num }}">J1</label>
+                        </div>
+                        <span class="mx-2 text-warning">R{{ ronda_num }}</span>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input ganador-radio"
+                                    type="radio"
+                                    name="ganador_r{{ ronda_num }}"
+                                    id="ganador_j2_r{{ ronda_num }}"
+                                    data-ronda="{{ ronda_num }}"
+                                    data-jugador="2">
+                            <label class="form-check-label" for="ganador_j2_r{{ ronda_num }}">J2</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Jugador 2: Personaje (alineado a la derecha) -->
+                <div class="player-info text-end">
+                    <select class="form-select mb-2 personaje-select personaje-j2-r{{ ronda_num }}"
+                            name="personaje2r{{ ronda_num }}"
+                            id="personaje2r{{ ronda_num }}">
+                        <option value="">Selecciona personaje</option>
+                        <!-- Se llenará dinámicamente -->
+                    </select>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Videos -->
+        <div class="mt-3">
+            <label for="videosInput" class="form-label">Enlaces a videos (separados por coma):</label>
+            <textarea class="form-control" name="videos" id="videosInput" rows="2"></textarea>
+        </div>
+
+        <input type="hidden" id="matchId" name="match_id">
+        <button type="submit" class="btn btn-primary mt-3">Guardar Resultados</button>
+    </form>
+</div>
+
+<div id="backContainer">
+    <a href="{{ url_for('gestion_rondas', evento_id=ronda.evento.id) }}" class="btn btn-secondary mt-3">Volver</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Datos de todos los personajes
+    const todosPersonajes = [
+        {% for personaje in todos_personajes %}
+        { id: {{ personaje.id }}, nombre: "{{ personaje.nombre|safe }}" },
+        {% endfor %}
+    ];
+
+    // Datos de los participantes
+    const participantesData = {
+        {% for asistencia in ronda.evento.asistencias %}
+        {{ asistencia.participante.id }}: {
+            nickname: "{{ asistencia.participante.nickname }}",
+            personajes: [
+                {% for personaje in asistencia.participante.personajes %}
+                { id: {{ personaje.id }}, nombre: "{{ personaje.nombre }}" },
+                {% endfor %}
+            ]
+        },
+        {% endfor %}
+    };
+
+    // Datos de los matches
+    const matchesData = [
+        {% for match in ronda.matches %}
+        {
+            id: {{ match.id }},
+            jugador1_id: {{ match.jugador1_id }},
+            jugador2_id: {{ match.jugador2_id }},
+            {% for ronda_num in range(1, 6) %}
+            personaje1r{{ ronda_num }}_id: {{ match|get_attr('personaje1r' ~ ronda_num ~ '_id') or 'null' }},
+            personaje2r{{ ronda_num }}_id: {{ match|get_attr('personaje2r' ~ ronda_num ~ '_id') or 'null' }},
+            ganador_r{{ ronda_num }}: {{ match|get_attr('ganador_r' ~ ronda_num) or 'null' }},
+            {% endfor %}
+            ganador_match: {{ match.ganador_match or 'null' }},
+            videos: {{ match.videos|tojson if match.videos else 'null' }}
+        },
+        {% endfor %}
+    ];
+
+    // Variable para almacenar instancias de Tom Select
+    const tomSelectInstances = {};
+
+    // Función para mostrar/ocultar el ganador del match
+    function actualizarGanadorMatch(match) {
+        const ganadorContainer = document.getElementById('ganadorMatchContainer');
+        const ganadorNombre = document.getElementById('ganadorMatchNombre');
+
+        if (match && match.ganador_match) {
+            const ganadorId = match.ganador_match;
+            const ganador = participantesData[ganadorId];
+            if (ganador) {
+                ganadorNombre.textContent = ganador.nickname;
+                ganadorContainer.style.display = 'block';
+            } else {
+                ganadorContainer.style.display = 'none';
+            }
+        } else {
+            ganadorContainer.style.display = 'none';
+        }
+    }
+
+    // Esperar a que Tom Select esté listo antes de inicializar
+    onTomSelectReady(function() {
+        console.log("Inicializando Matchups - Tom Select está listo");
+        inicializarMatchups();
+    });
+
+    // Función para inicializar Tom Select en un elemento
+    function inicializarTomSelect(elemento, id) {
+        if (tomSelectInstances[id]) {
+            tomSelectInstances[id].destroy();
+        }
+
+        tomSelectInstances[id] = new TomSelect(elemento, {
+            valueField: 'id',
+            labelField: 'nombre',
+            searchField: 'nombre',
+            options: todosPersonajes,
+            create: false,
+            placeholder: 'Selecciona personaje',
+            render: {
+                option: function(item, escape) {
+                    return '<div>' + escape(item.nombre) + '</div>';
+                }
+            }
+        });
+    }
+
+    // Función para restaurar todas las opciones
+    function restaurarOpciones() {
+        const opciones = document.querySelectorAll('#jugador1 option, #jugador2 option');
+        opciones.forEach(opcion => {
+            opcion.disabled = false;
+            opcion.style.display = 'block';
+        });
+    }
+
+    // Función para actualizar las opciones de los dropdowns
+    function actualizarDropdowns() {
+        const jugador1Id = document.getElementById('jugador1').value;
+        const jugador2Id = document.getElementById('jugador2').value;
+
+        // Restaurar todas las opciones primero
+        restaurarOpciones();
+
+        // Deshabilitar jugadores seleccionados en los dropdowns opuestos
+        const allOptions1 = document.querySelectorAll('#jugador1 option');
+        const allOptions2 = document.querySelectorAll('#jugador2 option');
+
+        if (jugador1Id) {
+            allOptions2.forEach(option => {
+                if (option.value === jugador1Id) {
+                    option.disabled = true;
+                }
+            });
+        }
+
+        if (jugador2Id) {
+            allOptions1.forEach(option => {
+                if (option.value === jugador2Id) {
+                    option.disabled = true;
+                }
+            });
+        }
+    }
+
+    // Función para sincronizar personajes de un jugador
+    function sincronizarPersonajes(jugador, valor) {
+        for (let i = 2; i <= 5; i++) {
+            const selectId = `personaje${jugador}r${i}`;
+            const select = document.getElementById(selectId);
+            if (select) {
+                select.value = valor;
+                if (tomSelectInstances[selectId]) {
+                    tomSelectInstances[selectId].setValue(valor);
+                }
+            }
+        }
+    }
+
+    // Función para manejar el cambio en los checkboxes de mismo personaje
+    function manejarMismoPersonaje(jugador, checked) {
+        if (checked) {
+            const primerSelect = document.getElementById(`personaje${jugador}r1`);
+            if (primerSelect && primerSelect.value) {
+                sincronizarPersonajes(jugador, primerSelect.value);
+            }
+        }
+    }
+
+    // Función para llenar los selects de personajes de una ronda
+    function llenarPersonajes(selectElement, personajes, id) {
+        // Limpiar el select
+        selectElement.innerHTML = '<option value="">Selecciona personaje</option>';
+
+        // Agregar todos los personajes
+        todosPersonajes.forEach(pers => {
+            const option = document.createElement('option');
+            option.value = pers.id;
+            option.textContent = pers.nombre;
+            selectElement.appendChild(option);
+        });
+
+        // Inicializar Tom Select en este select
+        inicializarTomSelect(selectElement, id);
+    }
+
+    // Función para cargar el formulario del match
+    function cargarMatch(jugador1Id, jugador2Id) {
+        // Desmarcar todos los radio buttons primero
+        desmarcarTodos();
+        // Si alguno está vacío, ocultar el formulario
+        if (!jugador1Id || !jugador2Id) {
+            document.getElementById('matchFormContainer').style.display = 'none';
+            return;
+        }
+
+        // Si son el mismo jugador, ocultar formulario y limpiar selección
+        if (jugador1Id === jugador2Id) {
+            document.getElementById('matchFormContainer').style.display = 'none';
+            // Restaurar opciones para permitir nueva selección
+            restaurarOpciones();
+            document.getElementById('jugador1').value = "";
+            document.getElementById('jugador2').value = "";
+            return;
+        }
+
+        // Buscar match que tenga estos dos jugadores (en cualquier orden)
+        const match = matchesData.find(m =>
+            (m.jugador1_id == jugador1Id && m.jugador2_id == jugador2Id) ||
+            (m.jugador1_id == jugador2Id && m.jugador2_id == jugador1Id)
+        );
+
+        if (match) {
+            document.getElementById('jugador1Id').value = jugador1Id;
+            document.getElementById('jugador2Id').value = jugador2Id;
+            document.getElementById('matchFormContainer').style.display = 'block';
+            document.getElementById('matchId').value = match.id;
+
+            // Mostrar el ganador del match si existe
+            actualizarGanadorMatch(match);
+
+            // Determinar el orden real en la base de datos
+            const esOrdenOriginal = match.jugador1_id == jugador1Id;
+            const jugador1 = participantesData[jugador1Id];
+            const jugador2 = participantesData[jugador2Id];
+
+            // Llenar personajes para cada ronda
+            for (let ronda_num = 1; ronda_num <= 5; ronda_num++) {
+                const selectJ1 = document.getElementById(`personaje1r${ronda_num}`);
+                llenarPersonajes(selectJ1, jugador1.personajes, `personaje1r${ronda_num}`);
+
+                const selectJ2 = document.getElementById(`personaje2r${ronda_num}`);
+                llenarPersonajes(selectJ2, jugador2.personajes, `personaje2r${ronda_num}`);
+
+                // Establecer valores guardados
+                const personaje1Id = match[`personaje1r${ronda_num}_id`];
+                const personaje2Id = match[`personaje2r${ronda_num}_id`];
+                const ganadorId = match[`ganador_r${ronda_num}`];
+
+                if (esOrdenOriginal) {
+                    if (personaje1Id) {
+                        selectJ1.value = personaje1Id;
+                        if (tomSelectInstances[`personaje1r${ronda_num}`]) {
+                            tomSelectInstances[`personaje1r${ronda_num}`].setValue(personaje1Id);
+                        }
+                    }
+                    if (personaje2Id) {
+                        selectJ2.value = personaje2Id;
+                        if (tomSelectInstances[`personaje2r${ronda_num}`]) {
+                            tomSelectInstances[`personaje2r${ronda_num}`].setValue(personaje2Id);
+                        }
+                    }
+
+                    if (ganadorId == match.jugador1_id) {
+                        document.getElementById(`ganador_j1_r${ronda_num}`).checked = true;
+                    } else if (ganadorId == match.jugador2_id) {
+                        document.getElementById(`ganador_j2_r${ronda_num}`).checked = true;
+                    }
+                } else {
+                    // Invertir valores
+                    if (personaje1Id) {
+                        selectJ2.value = personaje1Id;
+                        if (tomSelectInstances[`personaje2r${ronda_num}`]) {
+                            tomSelectInstances[`personaje2r${ronda_num}`].setValue(personaje1Id);
+                        }
+                    }
+                    if (personaje2Id) {
+                        selectJ1.value = personaje2Id;
+                        if (tomSelectInstances[`personaje1r${ronda_num}`]) {
+                            tomSelectInstances[`personaje1r${ronda_num}`].setValue(personaje2Id);
+                        }
+                    }
+
+                    if (ganadorId == match.jugador1_id) {
+                        document.getElementById(`ganador_j2_r${ronda_num}`).checked = true;
+                    } else if (ganadorId == match.jugador2_id) {
+                        document.getElementById(`ganador_j1_r${ronda_num}`).checked = true;
+                    }
+                }
+            }
+
+            // Establecer videos
+            document.getElementById('videosInput').value = match.videos || '';
+
+            // Reiniciar checkboxes
+            document.getElementById('mismoPersonajeJ1').checked = false;
+            document.getElementById('mismoPersonajeJ2').checked = false;
+        } else {
+            // Si no hay match, ocultar el contenedor del ganador
+            document.getElementById('ganadorMatchContainer').style.display = 'none';
+        }
+    }
+
+    // Función para actualizar los valores de los radio buttons
+    function actualizarValoresRadios() {
+        const jugador1Id = document.getElementById('jugador1').value;
+        const jugador2Id = document.getElementById('jugador2').value;
+
+        if (!jugador1Id || !jugador2Id) return;
+
+        // Actualizar todos los radio buttons
+        document.querySelectorAll('.ganador-radio').forEach(radio => {
+            const jugador = radio.getAttribute('data-jugador');
+            radio.value = jugador === '1' ? jugador1Id : jugador2Id;
+        });
+    }
+
+    // Función para desmarcar todos los radio buttons
+    function desmarcarTodos() {
+        // Desmarcar radio buttons
+        document.querySelectorAll('.ganador-radio').forEach(radio => {
+            radio.checked = false;
+        });
+
+        // Limpiar todos los selects de personajes
+        for (let ronda_num = 1; ronda_num <= 5; ronda_num++) {
+            const selectJ1 = document.getElementById(`personaje1r${ronda_num}`);
+            const selectJ2 = document.getElementById(`personaje2r${ronda_num}`);
+
+            if (selectJ1) {
+                selectJ1.value = "";
+                if (tomSelectInstances[`personaje1r${ronda_num}`]) {
+                    tomSelectInstances[`personaje1r${ronda_num}`].clear();
+                }
+            }
+
+            if (selectJ2) {
+                selectJ2.value = "";
+                if (tomSelectInstances[`personaje2r${ronda_num}`]) {
+                    tomSelectInstances[`personaje2r${ronda_num}`].clear();
+                }
+            }
+        }
+
+        // Desmarcar checkboxes de mismo personaje
+        document.getElementById('mismoPersonajeJ1').checked = false;
+        document.getElementById('mismoPersonajeJ2').checked = false;
+
+        // Ocultar el contenedor del ganador
+        document.getElementById('ganadorMatchContainer').style.display = 'none';
+    }
+
+    // Función para forzar la sincronización de todos los selects
+    function sincronizarTodosLosSelects() {
+        for (let id in tomSelectInstances) {
+            if (tomSelectInstances[id]) {
+                try {
+                    // Forzar la sincronización del valor actual
+                    const selectElement = document.getElementById(id);
+                    if (selectElement) {
+                        const currentValue = tomSelectInstances[id].getValue();
+                        selectElement.value = currentValue;
+                        console.log(`Sincronizado ${id} con valor: ${currentValue}`);
+                    }
+                } catch (e) {
+                    console.error('Error sincronizando select', id, e);
+                }
+            }
+        }
+    }
+
+    // Función para crear campos ocultos con los valores actuales
+    function crearCamposOcultos() {
+        // Eliminar campos ocultos previos si existen
+        document.querySelectorAll('input.tom-select-hidden-field').forEach(el => el.remove());
+
+        // Deshabilitar todos los selects originales para que no se envíen
+        document.querySelectorAll('select[name^="personaje"]').forEach(select => {
+            select.disabled = true;
+        });
+
+        for (let id in tomSelectInstances) {
+            if (tomSelectInstances[id]) {
+                const currentValue = tomSelectInstances[id].getValue();
+                const selectElement = document.getElementById(id);
+                if (selectElement && selectElement.name) {
+                    // Crear un campo oculto con el mismo nombre y el valor actual
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = selectElement.name;
+                    hiddenInput.value = currentValue;
+                    hiddenInput.className = 'tom-select-hidden-field';
+                    document.querySelector('form').appendChild(hiddenInput);
+                    console.log(`Campo oculto creado para ${selectElement.name} con valor: ${currentValue}`);
+                }
+            }
+        }
+    }
+
+    // Función para inicializar todos los event listeners
+    function inicializarEventListeners() {
+        // Event listeners para los selects de jugadores
+        document.getElementById('jugador1').addEventListener('change', function() {
+            desmarcarTodos();
+            actualizarDropdowns();
+            const jugador1Id = this.value;
+            const jugador2Id = document.getElementById('jugador2').value;
+            cargarMatch(jugador1Id, jugador2Id);
+            actualizarValoresRadios();
+        });
+
+        document.getElementById('jugador2').addEventListener('change', function() {
+            desmarcarTodos();
+            actualizarDropdowns();
+            const jugador1Id = document.getElementById('jugador1').value;
+            const jugador2Id = this.value;
+            cargarMatch(jugador1Id, jugador2Id);
+            actualizarValoresRadios();
+        });
+
+        // Event listeners para los checkboxes de mismo personaje
+        document.getElementById('mismoPersonajeJ1').addEventListener('change', function() {
+            manejarMismoPersonaje('1', this.checked);
+        });
+
+        document.getElementById('mismoPersonajeJ2').addEventListener('change', function() {
+            manejarMismoPersonaje('2', this.checked);
+        });
+
+        // Event listeners para los selects de la ronda 1
+        document.getElementById('personaje1r1').addEventListener('change', function() {
+            if (document.getElementById('mismoPersonajeJ1').checked) {
+                sincronizarPersonajes('1', this.value);
+            }
+        });
+
+        document.getElementById('personaje2r1').addEventListener('change', function() {
+            if (document.getElementById('mismoPersonajeJ2').checked) {
+                sincronizarPersonajes('2', this.value);
+            }
+        });
+
+        // Botón Refrescar
+        document.getElementById('btnRefrescar').addEventListener('click', function() {
+            desmarcarTodos();
+        });
+
+        // Event listener para el formulario
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log("Sincronizando todos los selects antes de enviar...");
+            sincronizarTodosLosSelects();
+            crearCamposOcultos();
+
+            console.log("Enviando formulario...");
+
+            // Rehabilitar los selects en el próximo ciclo de eventos
+            setTimeout(() => {
+                document.querySelectorAll('select[name^="personaje"]').forEach(select => {
+                    select.disabled = false;
+                });
+            }, 0);
+
+            this.submit();
+        });
+    }
+
+    // Función principal de inicialización
+    function inicializarMatchups() {
+        console.log("Inicializando todos los selects...");
+
+        // Inicializar todos los selects de personajes
+        const allSelects = document.querySelectorAll('select[name^="personaje"]');
+        allSelects.forEach(select => {
+            if (!tomSelectInstances[select.id]) {
+                console.log(`Inicializando select: ${select.id}`);
+                inicializarTomSelect(select, select.id);
+            }
+        });
+
+        // Inicializar event listeners
+        inicializarEventListeners();
+
+        // Actualizar radios si ya hay jugadores seleccionados
+        const jugador1 = document.getElementById('jugador1').value;
+        const jugador2 = document.getElementById('jugador2').value;
+
+        if (jugador1 && jugador2) {
+            actualizarValoresRadios();
+            cargarMatch(jugador1, jugador2);
+        }
+
+        console.log("Todos los selects inicializados");
+    }
+</script>
+{% endblock %}

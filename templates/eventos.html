@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Gestión de Eventos</h2>
+<hr>
+
+<!-- Modal para confirmar activar/desactivar evento -->
+<div class="modal fade" id="confirmarEstadoEventoModal" tabindex="-1" aria-labelledby="confirmarEstadoEventoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmarEstadoEventoModalLabel">Confirmar Cambio de Estado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="estadoEventoModalTexto">¿Estás seguro de que deseas cambiar el estado de este evento?</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formCambiarEstadoEvento" method="POST" action="">
+          <input type="hidden" name="id" id="eventoIdEstado">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formCambiarEstadoEvento" class="btn btn-primary" id="estadoEventoModalBoton">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para confirmar eliminación de evento -->
+<div class="modal fade" id="eliminarEventoModal" tabindex="-1" aria-labelledby="eliminarEventoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eliminarEventoModalLabel">Eliminar Evento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que deseas eliminar este evento? Se eliminarán todas las asistencias, rondas y partidas asociadas.</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formEliminarEvento" method="POST" action="">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formEliminarEvento" class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Crear Nuevo Evento</h3>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="fecha" class="form-label">Fecha del Evento</label>
+                <input type="date" class="form-control" id="fecha" name="fecha" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear Evento</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Eventos Registrados</h3>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Asistentes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evento in eventos %}
+                    <tr>
+                        <td>{{ evento.fecha }}</td>
+                        <td>{{ evento.asistencias|length }}</td>
+                        <td>
+                            <a href="{{ url_for('registrar_asistencia', evento_id=evento.id) }}" class="btn btn-sm btn-primary">Asistencia</a>
+                            <a href="{{ url_for('gestion_rondas', evento_id=evento.id) }}" class="btn btn-sm btn-success">Rondas</a>
+                            <!-- Botón Torneos
+                            <a href= "{{ url_for('gestion_torneos', evento_id=evento.id) }}" class="btn btn-sm btn-warning">Torneos 👑</a> -->
+                            <!-- Botón Activar/Desactivar -->
+                            <button type="button" class="btn btn-sm {% if evento.activo %}btn-outline-secondary{% else %}btn-outline-success{% endif %}"
+                                    data-bs-toggle="modal" data-bs-target="#confirmarEstadoEventoModal"
+                                    data-id="{{ evento.id }}"
+                                    data-activo="{{ evento.activo }}"
+                                    data-fecha="{{ evento.fecha }}">
+                                {% if evento.activo %}🔒{% else %}🔓{% endif %}
+                            </button>
+                            <!-- Botón Eliminar -->
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#eliminarEventoModal"
+                                    data-id="{{ evento.id }}">
+                                ❌
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Script para el modal de activar/desactivar evento
+    document.getElementById('confirmarEstadoEventoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var activo = button.getAttribute('data-activo') === 'True';
+        var fecha = button.getAttribute('data-fecha');
+
+        var form = document.getElementById('formCambiarEstadoEvento');
+        form.action = "{{ url_for('activar_desactivar_evento', id=0) }}".replace('0', id);
+
+        var textoModal = document.getElementById('estadoEventoModalTexto');
+        var botonModal = document.getElementById('estadoEventoModalBoton');
+
+        if (activo) {
+            textoModal.textContent = `¿Estás seguro de que deseas desactivar el evento del ${fecha}? Los eventos desactivados no permiten modificar sus datos.`;
+            botonModal.className = 'btn btn-warning';
+            botonModal.textContent = 'Bloquear';
+        } else {
+            textoModal.textContent = `¿Estás seguro de que deseas activar el evento del ${fecha}?`;
+            botonModal.className = 'btn btn-success';
+            botonModal.textContent = 'Desbloquear';
+        }
+    });
+
+    // Script para el modal de eliminar evento
+    document.getElementById('eliminarEventoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var form = document.getElementById('formEliminarEvento');
+        form.action = "{{ url_for('eliminar_evento', id=0) }}".replace('0', id);
+    });
+</script>
+{% endblock %}

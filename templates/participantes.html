@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Gestión de Participantes</h2>
+<hr>
+
+<!-- Modal para Actualizar Personajes -->
+<div class="modal fade" id="modalActualizarPersonajes" tabindex="-1" aria-labelledby="modalActualizarPersonajesLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalActualizarPersonajesLabel">Actualizar Personajes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('actualizar_personajes_participantes') }}">
+        <div class="modal-body">
+          <p>Esta acción actualizará los personajes de todos los participantes basándose en los matches jugados.</p>
+          <p>(Los personajes que no se hayan utilizado se eliminaran)</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Actualizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para editar participante -->
+<div class="modal fade" id="editarParticipanteModal" tabindex="-1" aria-labelledby="editarParticipanteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarParticipanteModalLabel">Editar Participante</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="formEditarParticipante" method="POST" action="{{ url_for('actualizar_participante') }}">
+        <input type="hidden" name="id" id="editParticipanteId">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nicknameEdit" class="form-label">Nickname</label>
+            <input type="text" class="form-control" id="nicknameEdit" name="nickname" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para confirmar retirar/reactivar participante -->
+<div class="modal fade" id="confirmarEstadoModal" tabindex="-1" aria-labelledby="confirmarEstadoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmarEstadoModalLabel">Confirmar Cambio de Estado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="estadoModalTexto">¿Estás seguro de que deseas cambiar el estado de este participante?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form id="formCambiarEstado" method="POST" action="" style="display: inline;">
+          <button type="submit" class="btn btn-primary" id="estadoModalBoton">Confirmar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para confirmar borrado -->
+<div class="modal fade" id="confirmarBorradoModal" tabindex="-1" aria-labelledby="confirmarBorradoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmarBorradoModalLabel">Confirmar eliminación permanente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Esta acción eliminará permanentemente al participante y todos sus datos. Esta acción no se puede deshacer.</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formBorrarPermanente" method="POST" action="">
+          <input type="hidden" name="id" id="participanteIdBorrar">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formBorrarPermanente" class="btn btn-danger">Eliminar permanentemente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Registrar Nuevo Participante</h3>
+        <form method="POST" action="{{ url_for('gestion_participantes') }}">
+            <div class="mb-3">
+                <label for="nickname" class="form-label">Nickname</label>
+                <input type="text" class="form-control" id="nickname" name="nickname" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Registrar Participante</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Lista de Participantes</h3>
+            <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalActualizarPersonajes">
+                🔄 Actualizar Personajes
+            </button>
+            <small class="text-muted ms-2">Próxima actualización automática: <span id="proxima-actualizacion"></span></small>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nickname</th>
+                        <th>Personajes Utilizados</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for participante in participantes %}
+                    <tr class="{% if not participante.activo %}table-secondary{% endif %}">
+                        <td>
+                            <a href="{{ url_for('historial_participante', id=participante.id) }}">
+                                {{ participante.nickname }}
+                            </a>
+                            {% if not participante.activo %}<span class="text-muted"> (Retirado)</span>{% endif %}
+                        </td>
+                        <td>
+                            {% for personaje in participante.personajes %}
+                            <span class="badge bg-primary">{{ personaje.nombre }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <!-- Botón Editar -->
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    data-bs-toggle="modal" data-bs-target="#editarParticipanteModal"
+                                    data-id="{{ participante.id }}" data-nickname="{{ participante.nickname }}">
+                                ✏️
+                            </button>
+
+                            <!-- Botón Activar/Desactivar -->
+                            <button type="button" class="btn btn-sm {% if participante.activo %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                    data-bs-toggle="modal" data-bs-target="#confirmarEstadoModal"
+                                    data-id="{{ participante.id }}"
+                                    data-activo="{{ participante.activo }}"
+                                    data-nickname="{{ participante.nickname }}">
+                                {% if participante.activo %}❌{% else %}✅{% endif %}
+                            </button>
+
+                            <!-- Botón Borrar permanente -->
+                            <button type="button" class="btn btn-sm btn-outline-dark"
+                                    data-bs-toggle="modal" data-bs-target="#confirmarBorradoModal"
+                                    data-id="{{ participante.id }}">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Script para el modal de editar participante
+    document.getElementById('editarParticipanteModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var nickname = button.getAttribute('data-nickname');
+        document.getElementById('editParticipanteId').value = id;
+        document.getElementById('nicknameEdit').value = nickname;
+    });
+
+    // Script para el modal de cambiar estado (retirar/reactivar)
+    document.getElementById('confirmarEstadoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var activo = button.getAttribute('data-activo') === 'True';
+        var nickname = button.getAttribute('data-nickname');
+
+        var form = document.getElementById('formCambiarEstado');
+        form.action = "{{ url_for('eliminar_participante', id=0) }}".replace('0', id);
+
+        var textoModal = document.getElementById('estadoModalTexto');
+        var botonModal = document.getElementById('estadoModalBoton');
+
+        if (activo) {
+            textoModal.textContent = `¿Estás seguro de que deseas retirar a "${nickname}"?`;
+            botonModal.className = 'btn btn-danger';
+            botonModal.textContent = 'Retirar';
+        } else {
+            textoModal.textContent = `¿Estás seguro de que deseas reactivar a "${nickname}"?`;
+            botonModal.className = 'btn btn-success';
+            botonModal.textContent = 'Reactivar';
+        }
+    });
+
+    // Script para manejar el modal de borrado
+    document.getElementById('confirmarBorradoModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var form = document.getElementById('formBorrarPermanente');
+        form.action = "{{ url_for('borrar_participante', id=0) }}".replace('0', id);
+    });
+
+    // Función para calcular y mostrar la próxima actualización
+    function actualizarContadorProximaActualizacion() {
+        const intervaloHoras = {{ INTERVALO_ACTUALIZACION_HORAS }};
+        const ahora = new Date();
+        const proximaActualizacion = new Date(ahora.getTime() + (intervaloHoras * 60 * 60 * 1000));
+
+        document.getElementById('proxima-actualizacion').textContent =
+            proximaActualizacion.toLocaleTimeString() + ' ' + proximaActualizacion.toLocaleDateString();
+    }
+
+    // Actualizar el contador al cargar la página y cada minuto
+    document.addEventListener('DOMContentLoaded', function() {
+        actualizarContadorProximaActualizacion();
+        setInterval(actualizarContadorProximaActualizacion, 60000); // Actualizar cada minuto
+    });
+</script>
+{% endblock %}

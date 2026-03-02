@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Rondas para Evento: {{ evento.fecha }}</h2>
+<hr>
+
+<!-- Modal Lista Matches Realizados -->
+<div class="modal fade" id="realizadasModal" tabindex="-1" aria-labelledby="realizadasModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pendientesModalLabel">Partidas Realizadas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul id="listaRealizadas">
+          <!-- Aquí se insertarán dinámicamente las realizadas -->
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Lista Matches Pendientes -->
+<div class="modal fade" id="pendientesModal" tabindex="-1" aria-labelledby="pendientesModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pendientesModalLabel">Partidas pendientes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul id="listaPendientes">
+          <!-- Aquí se insertarán dinámicamente los pendientes -->
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Ronda -->
+<div class="modal fade" id="editarRondaModal" tabindex="-1" aria-labelledby="editarRondaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarRondaModalLabel">Editar Ronda</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="" id="formEditarRonda">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nombreRonda" class="form-label">Nuevo nombre de la ronda</label>
+            <input type="text" class="form-control" id="nombreRonda" name="nombre" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Eliminar Ronda -->
+<div class="modal fade" id="eliminarRondaModal" tabindex="-1" aria-labelledby="eliminarRondaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="eliminarRondaModalLabel">Eliminar Ronda</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que quieres eliminar esta ronda? Se eliminarán todos los matches asociados.</p>
+        <p>Ingrese el código secreto para continuar:</p>
+        <form id="formEliminarRonda" method="POST" action="">
+          <div class="mb-3">
+            <input type="password" class="form-control" name="codigo_secreto" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" form="formEliminarRonda" class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Crear Nueva Ronda</h3>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="nombre" class="form-label">Nombre de la Ronda</label>
+                <input type="text" class="form-control" id="nombre" name="nombre" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear Ronda</button>
+            <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
+        </form>
+    </div>
+
+    <div class="col-md-6">
+        <h3>Rondas Registradas</h3>
+        {% if evento.rondas %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Partidas</th>
+                        <th>Pendientes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ronda in evento.rondas %}
+                    <tr>
+                        <td>{{ ronda.nombre }}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-success"
+                                    data-realizadas="{{ ronda.lista_realizadas | join('|||||') }}"
+                                    onclick="mostrarRealizadas()"
+                                    data-bs-toggle="modal" data-bs-target="#realizadasModal">
+                                {{ ronda.realizadas }}/{{ ronda.matches|length }}
+                            </button>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm {% if ronda.pendientes > 0 %}btn-warning{% else %}btn-success{% endif %}"
+                                    data-pendientes="{{ ronda.lista_pendientes | join('|||') }}"
+                                    onclick="mostrarPendientes()"
+                                    data-bs-toggle="modal" data-bs-target="#pendientesModal">
+                                {{ ronda.pendientes }}/{{ ronda.matches|length }}
+                            </button>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('gestion_matchups', ronda_id=ronda.id) }}" class="btn btn-sm btn-primary">Matchups</a>
+
+                            <!-- Botón Editar -->
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal" data-bs-target="#editarRondaModal"
+                                    data-id="{{ ronda.id }}" data-nombre="{{ ronda.nombre }}">
+                                ✏️
+                            </button>
+
+                            <!-- Botón Eliminar -->
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal" data-bs-target="#eliminarRondaModal"
+                                    data-id="{{ ronda.id }}">
+                                ❌
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            No hay rondas registradas para este evento.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Script para el modal de editar ronda
+    document.getElementById('editarRondaModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var nombre = button.getAttribute('data-nombre');
+        var form = document.getElementById('formEditarRonda');
+        form.action = "{{ url_for('editar_ronda', id=0) }}".replace('0', id);
+        document.getElementById('nombreRonda').value = nombre;
+    });
+
+    // Script para el modal de eliminar ronda
+    document.getElementById('eliminarRondaModal').addEventListener('show.bs.modal', function (event) {
+        var button = event.relatedTarget;
+        var id = button.getAttribute('data-id');
+        var form = document.getElementById('formEliminarRonda');
+        form.action = "{{ url_for('eliminar_ronda', id=0) }}".replace('0', id);
+    });
+
+
+    // Función para mostrar las realizadas en el modal
+    function mostrarRealizadas() {
+        const lista = document.getElementById('listaRealizadas');
+        lista.innerHTML = ''; // Limpiar lista anterior
+
+        // Obtener las realizadas del botón que activó el modal
+        const button = event.currentTarget;
+        const realizadasString = button.getAttribute('data-realizadas');
+
+        // Si no hay realizadas o la cadena está vacía
+        if (!realizadasString || realizadasString.trim() === "") {
+            lista.innerHTML = '<li>No hay partidas realizadas</li>';
+            return;
+        }
+
+        // Dividir la cadena usando el separador personalizado
+        const realizadas = realizadasString.split('|||||');
+
+        // Si después de dividir no hay elementos válidos
+        if (realizadas.length === 0 || realizadas[0] === "") {
+            lista.innerHTML = '<li>No hay partidas realizadas</li>';
+            return;
+        }
+
+        // Crear elementos de lista para cada enfrentamiento
+        realizadas.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p;
+            lista.appendChild(li);
+        });
+    }
+
+
+    // Función para mostrar los pendientes en el modal
+    function mostrarPendientes() {
+        const lista = document.getElementById('listaPendientes');
+        lista.innerHTML = ''; // Limpiar lista anterior
+
+        // Obtener los pendientes del botón que activó el modal
+        const button = event.currentTarget;
+        const pendientesString = button.getAttribute('data-pendientes');
+
+        // Si no hay pendientes o la cadena está vacía
+        if (!pendientesString || pendientesString.trim() === "") {
+            lista.innerHTML = '<li>No hay partidas pendientes</li>';
+            return;
+        }
+
+        // Dividir la cadena usando el separador personalizado
+        const pendientes = pendientesString.split('|||');
+
+        // Si después de dividir no hay elementos válidos
+        if (pendientes.length === 0 || pendientes[0] === "") {
+            lista.innerHTML = '<li>No hay partidas pendientes</li>';
+            return;
+        }
+
+        // Crear elementos de lista para cada enfrentamiento
+        pendientes.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p;
+            lista.appendChild(li);
+        });
+    }
+</script>
+{% endblock %}
