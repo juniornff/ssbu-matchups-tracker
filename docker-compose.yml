@@ -6,6 +6,5 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - .:/app
       - ./instance:/app/instance
       - ./pass.txt:/app/pass.txt
