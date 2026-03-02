@@ -11,7 +11,9 @@ venv/
 dist/
 build/
 
-# Base de datos SQLite
+# Base de datos SQLite (se monta como volumen)
+instance/
+*.db
 *.sqlite
 *.sqlite3
 
