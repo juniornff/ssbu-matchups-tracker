@@ -14,6 +14,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - Current round configuration for quick access to ongoing matches.
 - Automatic update of used characters based on played matches.
 - Responsive interface (works on mobile).
+- Automated deployment via GitHub Actions (CI/CD) to a private server.
 
 ## Technologies used
 
@@ -21,6 +22,15 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - **Database**: SQLite (with SQLAlchemy)
 - **Frontend**: Bootstrap 5, Tom Select (for enhanced selects)
 - **Task scheduling**: APScheduler
+- **CI/CD**: GitHub Actions, Docker, GitHub Container Registry (ghcr.io)
+
+## Future Plans
+
+- **Database Migration:** Transition from SQLite to **MySQL** for improved scalability, concurrent access, and performance as the community grows.
+
+- **Tournament Bracket Engine:** Integrate the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library through a custom-built **REST API** to automate bracket generation, management, and real-time updates for single/double‑elimination tournaments.
+
+- **User Authentication & Profiles:** Implement a secure user login system (e.g., OAuth or email/password) to enable personalized experiences, role‑based access control, and the ability for players to manage their registrations and match histories.
 
 ## Prerequisites
 
