@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 import os
-from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Match
+from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, Match
 import utils
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import atexit
 from datetime import datetime
+import requests
 
 # Crear la aplicación Flask
 app = Flask(__name__)
@@ -33,6 +34,8 @@ Codigo_Secreto = utils.obtener_Codigo_Secreto()
 ronda_actual_id = None
 # Variable ajustable para el intervalo (en horas)
 INTERVALO_ACTUALIZACION_HORAS = 24
+# Variable para el URL del API de Torneos
+API_TORNEOS_URL = "http://localhost:3000"
 
 # Función para la tarea programada
 def actualizar_personajes_automatico():
@@ -761,16 +764,53 @@ def gestion_torneos(evento_id):
     evento = Evento.query.get_or_404(evento_id)
 
     if request.method == 'POST':
+        if not evento.activo:
+            flash('Evento bloqueado, no se pueden crear torneos', 'danger')
+            return redirect(url_for('gestion_torneos', evento_id=evento_id))
+
+        # Construir datos del torneo desde el formulario
+        datos_torneo = {
+            'name': request.form.get('name'),
+            'formato': request.form.get('formato'),
+            # Agrega aquí otros campos que requiera la API
+        }
+
+        # Enviar a la API externa
+        try:
+            response = requests.post(f"{API_TORNEOS_URL}/tournaments", json=datos_torneo)
+            response.raise_for_status()
+            resp_json = response.json()
+            # Extraer stageId
+            stage_id = resp_json.get('stageId')
+            if not stage_id:
+                flash('La respuesta de la API no contiene stageId', 'danger')
+                return redirect(url_for('gestion_torneos', evento_id=evento_id))
+
+            # Guardar en la base de datos
+            nuevo_torneo = Torneo(
+                evento_id=evento_id,
+                torneo_id_externo=stage_id,
+                nombre=data.get('name', 'Torneo sin nombre')  # ejemplo, asumiendo que viene en data
+            )
+            db.session.add(nuevo_torneo)
+            db.session.commit()
+            flash('Torneo creado exitosamente', 'success')
+        except requests.exceptions.RequestException as e:
+            flash(f'Error al comunicarse con la API: {str(e)}', 'danger')
+        except Exception as e:
+            flash(f'Error inesperado: {str(e)}', 'danger')
+
         return redirect(url_for('gestion_torneos', evento_id=evento_id))
 
-    return render_template('torneos.html', evento=evento)
+    torneos = Torneo.query.filter_by(evento_id=evento_id).all()
+    return render_template('torneos.html', evento=evento, torneos=torneos)
 
 @app.route('/evento/torneo/editar', methods=['POST'])
 def editar_torneo():
     return redirect(url_for('gestion_torneos'))
 
-@app.route('/evento/torneo/eliminar', methods=['POST'])
-def eliminar_torneo():
+@app.route('/evento/torneo/eliminar/<int:torneo_id>', methods=['POST'])
+def eliminar_torneo(torneo_id):
     codigo = request.form.get('codigo_secreto', '')
 
     if codigo != Codigo_Secreto:
@@ -779,10 +819,10 @@ def eliminar_torneo():
 
     return redirect(url_for('gestion_torneos'))
 
-@app.route('/evento/torneo/brackets', methods=['GET', 'POST'])
-def gestion_brackets():
+@app.route('/evento/torneo/brackets/<int:torneo_id>', methods=['GET', 'POST'])
+def gestion_brackets(torneo_id):
     if request.method == 'POST':
-        return redirect(url_for('gestion_brackets'))
+        return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
     return render_template('torneo_brackets.html')
 

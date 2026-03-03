@@ -1,133 +1,284 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Torneos para Evento: {{ evento.fecha }}</h2>
+<h2>Torneos del Evento: {{ evento.fecha }}</h2>
 <hr>
 
-<!-- Modal Editar Torneo -->
-<div class="modal fade" id="editarTorneoModal" tabindex="-1" aria-labelledby="editarTorneoModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="editarRondaModalLabel">Editar Torneo</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form method="POST" action="" id="formEditarTorneo">
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="nombreTorneo" class="form-label">Nuevo nombre del torneo</label>
-            <input type="text" class="form-control" id="nombreTorneo" name="nombre" required>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<!-- Botón Volver a Eventos -->
+<div class="mb-3">
+    <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">⬅️ Volver a Eventos</a>
 </div>
 
-<!-- Modal Eliminar Ronda -->
-<div class="modal fade" id="eliminarRondaModal" tabindex="-1" aria-labelledby="eliminarTorneoModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="eliminarRondaModalLabel">Eliminar Torneo</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p>¿Estás seguro de que quieres eliminar este Torneo? Se eliminarán todos los matches asociados.</p>
-        <p>Ingrese el código secreto para continuar:</p>
-        <form id="formEliminarTorneo" method="POST" action="">
-          <div class="mb-3">
-            <input type="password" class="form-control" name="codigo_secreto" required>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="submit" form="formEliminarRonda" class="btn btn-danger">Eliminar</button>
-      </div>
+<!-- Botón para abrir modal de creación -->
+<button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#crearTorneoModal">
+    ➕ Crear Torneo
+</button>
+
+<!-- Lista de torneos -->
+{% if torneos %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Nombre</th>
+                <th>Fecha creación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in torneos|sort(attribute='fecha_creacion') %}
+            <tr>
+                <td>{{ t.nombre }}</td>
+                <td>{{ t.fecha_creacion.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    <a href="{{ url_for('gestion_brackets', torneo_id=t.id) }}" class="btn btn-sm btn-primary">Brackets</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#eliminarTorneoModal" data-id="{{ t.id }}" data-nombre="{{ t.nombre }}">
+                        ❌
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No hay torneos creados para este evento.</p>
+{% endif %}
+
+<!-- Modal Crear Torneo -->
+<div class="modal fade" id="crearTorneoModal" tabindex="-1" aria-labelledby="crearTorneoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('gestion_torneos', evento_id=evento.id) }}" id="formCrearTorneo">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="crearTorneoModalLabel">Crear Nuevo Torneo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Campos ocultos para enviar datos procesados -->
+                    <input type="hidden" name="seeding" id="seedingInput">
+
+                    <!-- Navegación por pestañas -->
+                    <ul class="nav nav-tabs mb-3" id="torneoTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">General</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="ajustes-tab" data-bs-toggle="tab" data-bs-target="#ajustes" type="button" role="tab">Ajustes</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="torneoTabContent">
+                        <!-- Pestaña General -->
+                        <div class="tab-pane fade show active" id="general" role="tabpanel">
+                            <div class="mb-3">
+                                <label for="nombreTorneo" class="form-label">Nombre del torneo</label>
+                                <input type="text" class="form-control" id="nombreTorneo" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tipoTorneo" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipoTorneo" name="type" required>
+                                    <option value="">Selecciona un tipo</option>
+                                    <option value="round_robin">Round Robin</option>
+                                    <option value="single_elimination">Single Elimination</option>
+                                    <option value="double_elimination">Double Elimination</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Participantes (arrastra para ordenar)</label>
+                                <div id="participantesList" class="list-group">
+                                    {% for asistencia in evento.asistencias %}
+                                        {% if asistencia.participante.activo %}
+                                        <div class="list-group-item d-flex align-items-center" data-participante-id="{{ asistencia.participante.id }}" data-nombre="{{ asistencia.participante.nickname }}">
+                                            <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                            <input class="form-check-input me-2 participante-checkbox" type="checkbox" value="{{ asistencia.participante.nickname }}" checked>
+                                            <span>{{ asistencia.participante.nickname }}</span>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <small class="text-muted">Desmarca los participantes que no participen. Arrastra para cambiar el orden.</small>
+                            </div>
+                        </div>
+
+                        <!-- Pestaña Ajustes - Todos los campos con descripciones -->
+                        <div class="tab-pane fade" id="ajustes" role="tabpanel">
+                            <h6 class="mb-3">Configuración avanzada del torneo</h6>
+
+                            <!-- balanceByes -->
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="balanceByes" name="balanceByes">
+                                <label class="form-check-label" for="balanceByes">balanceByes</label>
+                                <small class="form-text text-muted d-block">Balancea los BYEs en la siembra de una etapa de eliminación. Evita que haya BYE contra BYE en los partidos.</small>
+                            </div>
+
+                            <!-- consolationFinal -->
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="consolationFinal" name="consolationFinal">
+                                <label class="form-check-label" for="consolationFinal">consolationFinal</label>
+                                <small class="form-text text-muted d-block">Final opcional entre los perdedores de semifinales.</small>
+                            </div>
+
+                            <!-- grandFinal -->
+                            <div class="mb-3">
+                                <label for="grandFinal" class="form-label">grandFinal</label>
+                                <select class="form-select" id="grandFinal" name="grandFinal">
+                                    <option value="">No especificado</option>
+                                    <option value="none">none - Sin gran final</option>
+                                    <option value="simple">simple - Un solo partido final</option>
+                                    <option value="double">double - Final doble (reinicio si pierde el ganador de bracket superior)</option>
+                                </select>
+                                <small class="form-text text-muted">Gran final opcional entre ganadores de bracket superior e inferior.</small>
+                            </div>
+
+                            <!-- groupCount -->
+                            <div class="mb-3">
+                                <label for="groupCount" class="form-label">groupCount</label>
+                                <input type="number" class="form-control" id="groupCount" name="groupCount" min="1" placeholder="Ej. 1">
+                                <small class="form-text text-muted">Número de grupos en una etapa round-robin.</small>
+                            </div>
+
+                            <!-- manualOrdering -->
+                            <div class="mb-3">
+                                <label for="manualOrdering" class="form-label">manualOrdering</label>
+                                <textarea class="form-control" id="manualOrdering" name="manualOrdering" rows="2" placeholder='Ej. [[1,2,3], [4,5,6]]'></textarea>
+                                <small class="form-text text-muted">Lista de semillas por grupo para ordenamiento manual (solo round-robin). Si se proporciona, se ignora seedOrdering.</small>
+                            </div>
+
+                            <!-- matchesChildCount -->
+                            <div class="mb-3">
+                                <label for="matchesChildCount" class="form-label">matchesChildCount</label>
+                                <input type="number" class="form-control" id="matchesChildCount" name="matchesChildCount" min="0" placeholder="Ej. 2">
+                                <small class="form-text text-muted">Todos los partidos de la etapa tendrán este número de hijos (partidas). Puede sobrescribirse después.</small>
+                            </div>
+
+                            <!-- roundRobinMode -->
+                            <div class="mb-3">
+                                <label for="roundRobinMode" class="form-label">roundRobinMode</label>
+                                <select class="form-select" id="roundRobinMode" name="roundRobinMode">
+                                    <option value="">No especificado</option>
+                                    <option value="simple">simple - Cada participante juega una vez contra cada oponente</option>
+                                    <option value="double">double - Cada participante juega dos veces (ida y vuelta)</option>
+                                </select>
+                                <small class="form-text text-muted">Modo para etapa round-robin.</small>
+                            </div>
+
+                            <!-- seedOrdering -->
+                            <div class="mb-3">
+                                <label for="seedOrdering" class="form-label">seedOrdering</label>
+                                <select class="form-select" id="seedOrdering" name="seedOrdering">
+                                    <option value="">No especificado</option>
+                                    <optgroup label="Métodos generales">
+                                        <option value="natural">natural - Mantener orden original</option>
+                                        <option value="reverse">reverse - Invertir orden</option>
+                                        <option value="half_shift">half_shift - Mover segunda mitad al frente</option>
+                                        <option value="reverse_half_shift">reverse_half_shift - Invertir cada mitad y concatenar</option>
+                                        <option value="pair_flip">pair_flip - Intercambiar cada par [1,2,3,4,…] → [2,1,4,3,…]</option>
+                                        <option value="inner_outer">inner_outer - Distribución clásica de bracket: 1 vs N, 2 vs N-1, etc.</option>
+                                    </optgroup>
+                                    <optgroup label="Métodos para grupos (round-robin)">
+                                        <option value="groups.effort_balanced">groups.effort_balanced - Distribuir semillas para equilibrar fuerzas</option>
+                                        <option value="groups.seed_optimized">groups.seed_optimized - Distribución "serpiente" para minimizar colisiones tempranas</option>
+                                        <option value="groups.bracket_optimized">groups.bracket_optimized - Optimizado para que los mejores se enfrenten lo más tarde posible</option>
+                                    </optgroup>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Método(s) de ordenamiento de semillas. Para doble eliminación se pueden especificar varios separados por coma (ej. natural,reverse). 
+                                    Por ahora solo se envía el primero.
+                                </small>
+                            </div>
+
+                            <!-- size -->
+                            <div class="mb-3">
+                                <label for="size" class="form-label">size</label>
+                                <input type="number" class="form-control" id="size" name="size" min="1" placeholder="Ej. 8">
+                                <small class="form-text text-muted">Número de participantes (generalmente se deduce de la lista, pero puede forzarse).</small>
+                            </div>
+
+                            <!-- skipFirstRound -->
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="skipFirstRound" name="skipFirstRound">
+                                <label class="form-check-label" for="skipFirstRound">skipFirstRound</label>
+                                <small class="form-text text-muted">Saltar la primera ronda del bracket superior en doble eliminación.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Torneo</button>
+                </div>
+            </form>
+        </div>
     </div>
-  </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <h3>Crear Nueva Torneo</h3>
-        <form method="POST">
-            <div class="mb-3">
-                <label for="nombre" class="form-label">Nombre del Torneo</label>
-                <input type="text" class="form-control" id="nombre" name="nombre" required>
+<!-- Modal Eliminar Torneo -->
+<div class="modal fade" id="eliminarTorneoModal" tabindex="-1" aria-labelledby="eliminarTorneoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eliminarTorneoModalLabel">Eliminar Torneo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <button type="submit" class="btn btn-primary">Crear Torneo</button>
-            <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
-        </form>
-    </div>
-
-    <div class="col-md-6">
-        <h3>Torneo Registrados</h3>
-        {% if evento.torneos %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-light">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for torneo in evento.torneos %}
-                    <tr>
-                        <td>{{ torneo.nombre }}</td>
-                        <td>
-                            <a href="{{ url_for('gestion_brackets') }}" class="btn btn-sm btn-warning">Brackets 👑</a>
-
-                            <!-- Botón Editar -->
-                            <button type="button" class="btn btn-sm btn-outline-secondary"
-                                    data-bs-toggle="modal" data-bs-target="#editarTorneoModal"
-                                    data-id="{{ ronda.id }}" data-nombre="{{ torneo.nombre }}">
-                                ✏️
-                            </button>
-
-                            <!-- Botón Eliminar -->
-                            <button type="button" class="btn btn-sm btn-outline-danger"
-                                    data-bs-toggle="modal" data-bs-target="#eliminarTorneoModal"
-                                    data-id="{{ ronda.id }}">
-                                ❌
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <form method="POST" action="" id="formEliminarTorneo">
+                <div class="modal-body">
+                    <p>¿Estás seguro de que deseas eliminar el torneo <strong id="torneoNombreEliminar"></strong>?</p>
+                    <p>Ingrese el código secreto para continuar:</p>
+                    <input type="hidden" name="id" id="torneoIdEliminar">
+                    <div class="mb-3">
+                        <input type="password" class="form-control" name="codigo_secreto" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
         </div>
-        {% else %}
-        <div class="alert alert-info">
-            No hay torneos registrados para este evento.
-        </div>
-        {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- SortableJS para ordenar participantes -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
-    // Script para el modal de editar ronda
-    document.getElementById('editarTorneoModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var id = button.getAttribute('data-id');
-        var nombre = button.getAttribute('data-nombre');
-        var form = document.getElementById('formEditarTorneo');
-        form.action = "{{ url_for('editar_torneo', id=0) }}".replace('0', id);
-        document.getElementById('nombreTorneo').value = nombre;
-    });
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar Sortable en la lista de participantes
+        const participantesList = document.getElementById('participantesList');
+        new Sortable(participantesList, {
+            animation: 150,
+            handle: '.handle',
+            draggable: '.list-group-item'
+        });
 
-    // Script para el modal de eliminar ronda
-    document.getElementById('eliminarTorneoModal').addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var id = button.getAttribute('data-id');
-        var form = document.getElementById('formEliminarTorneo');
-        form.action = "{{ url_for('eliminar_torneo', id=0) }}".replace('0', id);
+        // Construir el campo seeding al enviar el formulario
+        const form = document.getElementById('formCrearTorneo');
+        form.addEventListener('submit', function(e) {
+            const items = participantesList.querySelectorAll('.list-group-item');
+            const seeding = [];
+            items.forEach(item => {
+                const checkbox = item.querySelector('.participante-checkbox');
+                if (checkbox.checked) {
+                    seeding.push(checkbox.value);
+                }
+            });
+            document.getElementById('seedingInput').value = JSON.stringify(seeding);
+        });
+
+        // Modal de eliminar
+        const eliminarModal = document.getElementById('eliminarTorneoModal');
+        eliminarModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const nombre = button.getAttribute('data-nombre');
+            const form = document.getElementById('formEliminarTorneo');
+            form.action = "{{ url_for('eliminar_torneo', torneo_id=0) }}".replace('0', id);
+            document.getElementById('torneoIdEliminar').value = id;
+            document.getElementById('torneoNombreEliminar').textContent = nombre;
+        });
     });
 </script>
 {% endblock %}

@@ -87,8 +87,8 @@
                         <td>
                             <a href="{{ url_for('registrar_asistencia', evento_id=evento.id) }}" class="btn btn-sm btn-primary">Asistencia</a>
                             <a href="{{ url_for('gestion_rondas', evento_id=evento.id) }}" class="btn btn-sm btn-success">Rondas</a>
-                            <!-- Botón Torneos
-                            <a href= "{{ url_for('gestion_torneos', evento_id=evento.id) }}" class="btn btn-sm btn-warning">Torneos 👑</a> -->
+                            <!-- Botón Torneos -->
+                            <a href= "{{ url_for('gestion_torneos', evento_id=evento.id) }}" class="btn btn-sm btn-warning">Torneos 👑</a>
                             <!-- Botón Activar/Desactivar -->
                             <button type="button" class="btn btn-sm {% if evento.activo %}btn-outline-secondary{% else %}btn-outline-success{% endif %}"
                                     data-bs-toggle="modal" data-bs-target="#confirmarEstadoEventoModal"

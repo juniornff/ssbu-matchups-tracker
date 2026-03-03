@@ -40,6 +40,16 @@ class Ronda(db.Model):
     evento_id = db.Column(db.Integer, db.ForeignKey('evento.id'))
     matches = db.relationship('Match', backref='ronda')
 
+class Torneo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    evento_id = db.Column(db.Integer, db.ForeignKey('evento.id'), nullable=False)
+    torneo_id_externo = db.Column(db.Integer, nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relación con Evento
+    evento = db.relationship('Evento', backref=db.backref('torneos', lazy=True))
+
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ronda_id = db.Column(db.Integer, db.ForeignKey('ronda.id'))

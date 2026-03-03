@@ -43,8 +43,8 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 1. **Clone the repository**
 
     ```bash
-    git clone https://github.com/tu-usuario/ssbu-league-manager.git
-    cd ssbu-league-manager
+    git clone https://github.com/juniornff/ssbu-matchups-tracker.git
+    cd ssbu-matchups-tracker
     ```
 
 2. **Create and activate a virtual environment (recommended)**
