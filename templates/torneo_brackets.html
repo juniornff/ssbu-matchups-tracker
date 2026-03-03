@@ -1,10 +1,39 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Brackets del Torneo:</h2>
+<h2>Bracket del Torneo: {{ torneo.nombre }}</h2>
+<p class="text-muted">Evento: {{ torneo.evento.fecha }}</p>
+<hr>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Drarig29/brackets-viewer.js@master/dist/brackets-viewer.min.css" />
-<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/Drarig29/brackets-viewer.js@master/dist/brackets-viewer.min.js"></script>
+<!-- Botón Volver a Torneos -->
+<div class="mb-3">
+    <a href="{{ url_for('gestion_torneos', evento_id=torneo.evento_id) }}" class="btn btn-secondary">⬅️ Volver a Torneos</a>
+</div>
 
-<div class="brackets-viewer"></div>
+<!-- Contenedor donde se renderizará el bracket -->
+<div class="brackets-viewer" id="bracketsViewer"></div>
+
+<!-- Incluir CSS y JS de brackets-viewer -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Datos recibidos desde el backend (en formato JSON)
+        const stageData = {{ stage_data|tojson }};
+
+        // Verificar que los datos tengan la estructura esperada
+        if (stageData && stageData.stage && stageData.match && stageData.match_game && stageData.participant) {
+            window.bracketsViewer.render({
+                stages: stageData.stage,
+                matches: stageData.match,
+                matchGames: stageData.match_game,
+                participants: stageData.participant
+            });
+        } else {
+            console.error('Los datos del torneo no tienen la estructura esperada:', stageData);
+            document.getElementById('bracketsViewer').innerHTML = '<div class="alert alert-danger">Error: Los datos del torneo no son válidos para mostrar el bracket.</div>';
+        }
+    });
+</script>
 {% endblock %}

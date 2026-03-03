@@ -928,10 +928,24 @@ def eliminar_torneo(torneo_id):
 
 @app.route('/evento/torneo/brackets/<int:torneo_id>', methods=['GET', 'POST'])
 def gestion_brackets(torneo_id):
-    if request.method == 'POST':
-        return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+    torneo = Torneo.query.get_or_404(torneo_id)
+    stage_id = torneo.torneo_id_externo
 
-    return render_template('torneo_brackets.html')
+    try:
+        response = requests.get(f"{API_TORNEOS_URL}/stages/{stage_id}")
+        response.raise_for_status()
+        data = response.json()
+        # Se espera que la API devuelva un objeto con las claves: stage, match, match_game, participant
+    except requests.exceptions.RequestException as e:
+        flash(f'Error al obtener datos del torneo: {str(e)}', 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+    except Exception as e:
+        flash(f'Error inesperado: {str(e)}', 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+
+    return render_template('torneo_brackets.html', 
+                           torneo=torneo, 
+                           stage_data=data)
 
 @app.route('/evento/torneo/brackets/matchups', methods=['GET', 'POST'])
 def gestion_brackets_matchups():
