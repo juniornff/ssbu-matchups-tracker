@@ -862,7 +862,8 @@ def gestion_torneos(evento_id):
             resp_json = response.json()
             # Extraer stageId
             stage_id = resp_json.get('stageId')
-            if not stage_id:
+            app.logger.info(f"Stage id: {stage_id}")
+            if stage_id < 0 or stage_id is None:
                 flash('La respuesta de la API no contiene stageId', 'danger')
                 return redirect(url_for('gestion_torneos', evento_id=evento_id))
 
