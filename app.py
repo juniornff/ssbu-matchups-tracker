@@ -7,6 +7,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 import atexit
 from datetime import datetime
 import requests
+import json
 
 # Crear la aplicación Flask
 app = Flask(__name__)
@@ -770,10 +771,89 @@ def gestion_torneos(evento_id):
 
         # Construir datos del torneo desde el formulario
         datos_torneo = {
+            'tournamentId': 0,
             'name': request.form.get('name'),
-            'formato': request.form.get('formato'),
-            # Agrega aquí otros campos que requiera la API
+            'type': request.form.get('type'),
+            'seeding': json.loads(request.form.get('seeding', '[]')),
+            'settings': {
+                'balanceByes': 'balanceByes' in request.form,
+                'consolationFinal': 'consolationFinal' in request.form,
+                'grandFinal': request.form.get('grandFinal') or None,
+                'groupCount': request.form.get('groupCount', type=int) or None,
+                'manualOrdering': request.form.get('manualOrdering') or None,
+                'matchesChildCount': request.form.get('matchesChildCount', type=int) or None,
+                'roundRobinMode': request.form.get('roundRobinMode') or None,
+                'seedOrdering': json.loads(request.form.get('seedOrdering', '[]')),
+                'size': request.form.get('size', type=int) or None,
+                'skipFirstRound': 'skipFirstRound' in request.form,   
+            }
         }
+
+        # --- Validaciones ---
+        # 1. Campos requeridos
+        if not datos_torneo['name']:
+            flash('El nombre del torneo es obligatorio', 'danger')
+            return redirect(url_for('gestion_torneos', evento_id=evento_id))
+        if not datos_torneo['type']:
+            flash('El tipo de torneo es obligatorio', 'danger')
+            return redirect(url_for('gestion_torneos', evento_id=evento_id))
+        # Si no se proporcionó size, seeding debe tener al menos un participante
+        if not datos_torneo['settings'].get('size') and not datos_torneo['seeding']:
+            flash('Debes proporcionar participantes (seeding) o un número de participantes (size)', 'danger')
+            return redirect(url_for('gestion_torneos', evento_id=evento_id))
+
+        # 2. Limpiar settings eliminando valores no válidos
+        settings = datos_torneo['settings']
+        # Valores permitidos
+        allowed_grandFinal = {'none', 'simple', 'double'}
+        allowed_roundRobinMode = {'simple', 'double'}
+        allowed_seedOrdering_methods = {
+            'natural', 'reverse', 'half_shift', 'reverse_half_shift', 'pair_flip', 'inner_outer',
+            'groups.effort_balanced', 'groups.seed_optimized', 'groups.bracket_optimized'
+        }
+
+        cleaned_settings = {}
+        for key, value in settings.items():
+            if key in ('balanceByes', 'consolationFinal', 'skipFirstRound'):
+                # Booleanos: solo incluir si son True
+                if value:
+                    cleaned_settings[key] = True
+            elif key == 'grandFinal':
+                if value in allowed_grandFinal:
+                    cleaned_settings[key] = value
+            elif key == 'groupCount':
+                if value and value >= 1:
+                    cleaned_settings[key] = value
+            elif key == 'manualOrdering':
+                if value:
+                    try:
+                        # Intentar parsear como JSON; debe ser una lista de listas
+                        parsed = json.loads(value) if isinstance(value, str) else value
+                        if isinstance(parsed, list) and all(isinstance(item, list) for item in parsed):
+                            cleaned_settings[key] = parsed
+                        else:
+                            flash('El formato de manualOrdering no es válido, se ignorará', 'warning')
+                    except:
+                        flash('El formato de manualOrdering no es válido, se ignorará', 'warning')
+            elif key == 'matchesChildCount':
+                if value is not None and value >= 0:
+                    cleaned_settings[key] = value
+            elif key == 'roundRobinMode':
+                if value in allowed_roundRobinMode:
+                    cleaned_settings[key] = value
+            elif key == 'seedOrdering':
+                if value and isinstance(value, list):
+                    # Filtrar solo métodos válidos
+                    valid_seed = [m for m in value if m in allowed_seedOrdering_methods]
+                    if valid_seed:
+                        cleaned_settings[key] = valid_seed
+            elif key == 'size':
+                if value and value >= 1:
+                    cleaned_settings[key] = value
+
+        datos_torneo['settings'] = cleaned_settings
+
+        app.logger.info(f"Datos a enviar a la API: {datos_torneo}")
 
         # Enviar a la API externa
         try:
@@ -790,7 +870,7 @@ def gestion_torneos(evento_id):
             nuevo_torneo = Torneo(
                 evento_id=evento_id,
                 torneo_id_externo=stage_id,
-                nombre=data.get('name', 'Torneo sin nombre')  # ejemplo, asumiendo que viene en data
+                nombre=datos_torneo.get('name', 'Torneo sin nombre')  # ejemplo, asumiendo que viene en data
             )
             db.session.add(nuevo_torneo)
             db.session.commit()
@@ -817,7 +897,33 @@ def eliminar_torneo(torneo_id):
         flash('Código secreto incorrecto', 'danger')
         return redirect(url_for('gestion_torneos'))
 
-    return redirect(url_for('gestion_torneos'))
+    torneo = Torneo.query.get_or_404(torneo_id)
+
+    # Verificar que el evento esté activo
+    if not torneo.evento.activo:
+        flash('El evento está bloqueado, no se puede eliminar el torneo', 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+
+    stage_id = torneo.torneo_id_externo
+
+    try:
+        # Primero eliminar en la API
+        response = requests.delete(f"{API_TORNEOS_URL}/stages/{stage_id}")
+        if response.status_code not in (200, 204):
+            flash(f'Error al eliminar en la API: {response.status_code}', 'danger')
+            return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+
+        # Luego eliminar de la base de datos
+        db.session.delete(torneo)
+        db.session.commit()
+        flash('Torneo eliminado con éxito', 'success')
+    except requests.exceptions.RequestException as e:
+        flash(f'Error de conexión con la API: {str(e)}', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar torneo: {str(e)}', 'danger')
+
+    return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
 @app.route('/evento/torneo/brackets/<int:torneo_id>', methods=['GET', 'POST'])
 def gestion_brackets(torneo_id):

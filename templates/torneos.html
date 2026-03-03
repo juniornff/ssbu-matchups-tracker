@@ -1,6 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+    /* Forzar scroll en el modal de creación de torneo */
+    #crearTorneoModal .modal-body {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+</style>
+
 <h2>Torneos del Evento: {{ evento.fecha }}</h2>
 <hr>
 
@@ -57,6 +65,7 @@
                 <div class="modal-body">
                     <!-- Campos ocultos para enviar datos procesados -->
                     <input type="hidden" name="seeding" id="seedingInput">
+                    <input type="hidden" name="seedOrdering" id="seedOrderingInput">
 
                     <!-- Navegación por pestañas -->
                     <ul class="nav nav-tabs mb-3" id="torneoTab" role="tablist">
@@ -79,9 +88,9 @@
                                 <label for="tipoTorneo" class="form-label">Tipo</label>
                                 <select class="form-select" id="tipoTorneo" name="type" required>
                                     <option value="">Selecciona un tipo</option>
-                                    <option value="round_robin">Round Robin</option>
-                                    <option value="single_elimination">Single Elimination</option>
-                                    <option value="double_elimination">Double Elimination</option>
+                                    <option value="round_robin">Todos contra todos</option>
+                                    <option value="single_elimination">Eliminación Simple</option>
+                                    <option value="double_elimination">Eliminación Doble</option>
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -108,97 +117,128 @@
                             <!-- balanceByes -->
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="balanceByes" name="balanceByes">
-                                <label class="form-check-label" for="balanceByes">balanceByes</label>
+                                <label class="form-check-label" for="balanceByes">balancear los BYEs</label>
                                 <small class="form-text text-muted d-block">Balancea los BYEs en la siembra de una etapa de eliminación. Evita que haya BYE contra BYE en los partidos.</small>
                             </div>
 
                             <!-- consolationFinal -->
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="consolationFinal" name="consolationFinal">
-                                <label class="form-check-label" for="consolationFinal">consolationFinal</label>
+                                <label class="form-check-label" for="consolationFinal">Enfrentamiento de consolidación</label>
                                 <small class="form-text text-muted d-block">Final opcional entre los perdedores de semifinales.</small>
                             </div>
 
                             <!-- grandFinal -->
                             <div class="mb-3">
-                                <label for="grandFinal" class="form-label">grandFinal</label>
+                                <label for="grandFinal" class="form-label">Gran Final</label>
                                 <select class="form-select" id="grandFinal" name="grandFinal">
                                     <option value="">No especificado</option>
-                                    <option value="none">none - Sin gran final</option>
-                                    <option value="simple">simple - Un solo partido final</option>
-                                    <option value="double">double - Final doble (reinicio si pierde el ganador de bracket superior)</option>
+                                    <option value="none">Ninguno - Sin gran final</option>
+                                    <option value="simple">Simple - Un solo partido final</option>
+                                    <option value="double">Doble - Final doble (reinicio si pierde el ganador de bracket superior)</option>
                                 </select>
                                 <small class="form-text text-muted">Gran final opcional entre ganadores de bracket superior e inferior.</small>
                             </div>
 
                             <!-- groupCount -->
                             <div class="mb-3">
-                                <label for="groupCount" class="form-label">groupCount</label>
+                                <label for="groupCount" class="form-label">Cantidad de grupos</label>
                                 <input type="number" class="form-control" id="groupCount" name="groupCount" min="1" placeholder="Ej. 1">
-                                <small class="form-text text-muted">Número de grupos en una etapa round-robin.</small>
+                                <small class="form-text text-muted">Número de grupos en una etapa todos contra todos.</small>
                             </div>
 
                             <!-- manualOrdering -->
                             <div class="mb-3">
-                                <label for="manualOrdering" class="form-label">manualOrdering</label>
+                                <label for="manualOrdering" class="form-label">Orden manual</label>
                                 <textarea class="form-control" id="manualOrdering" name="manualOrdering" rows="2" placeholder='Ej. [[1,2,3], [4,5,6]]'></textarea>
-                                <small class="form-text text-muted">Lista de semillas por grupo para ordenamiento manual (solo round-robin). Si se proporciona, se ignora seedOrdering.</small>
+                                <small class="form-text text-muted">Lista de semillas por grupo para ordenamiento manual (solo todos contra todos). Si se proporciona, se ignora seedOrdering.</small>
                             </div>
 
                             <!-- matchesChildCount -->
                             <div class="mb-3">
-                                <label for="matchesChildCount" class="form-label">matchesChildCount</label>
+                                <label for="matchesChildCount" class="form-label">Hijos por partida</label>
                                 <input type="number" class="form-control" id="matchesChildCount" name="matchesChildCount" min="0" placeholder="Ej. 2">
-                                <small class="form-text text-muted">Todos los partidos de la etapa tendrán este número de hijos (partidas). Puede sobrescribirse después.</small>
+                                <small class="form-text text-muted">Todos los partidos torneo tendrán este número de hijos (partidas). Puede sobrescribirse después.</small>
                             </div>
 
                             <!-- roundRobinMode -->
                             <div class="mb-3">
-                                <label for="roundRobinMode" class="form-label">roundRobinMode</label>
+                                <label for="roundRobinMode" class="form-label">Modo Todos contra todos</label>
                                 <select class="form-select" id="roundRobinMode" name="roundRobinMode">
                                     <option value="">No especificado</option>
-                                    <option value="simple">simple - Cada participante juega una vez contra cada oponente</option>
-                                    <option value="double">double - Cada participante juega dos veces (ida y vuelta)</option>
+                                    <option value="simple">Simple - Cada participante juega una vez contra cada oponente</option>
+                                    <option value="double">Doble - Cada participante juega dos veces (ida y vuelta)</option>
                                 </select>
                                 <small class="form-text text-muted">Modo para etapa round-robin.</small>
                             </div>
 
-                            <!-- seedOrdering -->
+                            <!-- seedOrdering - AHORA CON CHECKBOXES ORDENABLES -->
                             <div class="mb-3">
-                                <label for="seedOrdering" class="form-label">seedOrdering</label>
-                                <select class="form-select" id="seedOrdering" name="seedOrdering">
-                                    <option value="">No especificado</option>
-                                    <optgroup label="Métodos generales">
-                                        <option value="natural">natural - Mantener orden original</option>
-                                        <option value="reverse">reverse - Invertir orden</option>
-                                        <option value="half_shift">half_shift - Mover segunda mitad al frente</option>
-                                        <option value="reverse_half_shift">reverse_half_shift - Invertir cada mitad y concatenar</option>
-                                        <option value="pair_flip">pair_flip - Intercambiar cada par [1,2,3,4,…] → [2,1,4,3,…]</option>
-                                        <option value="inner_outer">inner_outer - Distribución clásica de bracket: 1 vs N, 2 vs N-1, etc.</option>
-                                    </optgroup>
-                                    <optgroup label="Métodos para grupos (round-robin)">
-                                        <option value="groups.effort_balanced">groups.effort_balanced - Distribuir semillas para equilibrar fuerzas</option>
-                                        <option value="groups.seed_optimized">groups.seed_optimized - Distribución "serpiente" para minimizar colisiones tempranas</option>
-                                        <option value="groups.bracket_optimized">groups.bracket_optimized - Optimizado para que los mejores se enfrenten lo más tarde posible</option>
-                                    </optgroup>
-                                </select>
-                                <small class="form-text text-muted">
-                                    Método(s) de ordenamiento de semillas. Para doble eliminación se pueden especificar varios separados por coma (ej. natural,reverse). 
-                                    Por ahora solo se envía el primero.
-                                </small>
+                                <label class="form-label">Orden de participantes (selecciona y ordena)</label>
+                                <div id="seedOrderingList" class="list-group mb-2">
+                                    <!-- Métodos generales -->
+                                    <div class="list-group-item d-flex align-items-center" data-value="natural">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="natural">
+                                        <span>natural - Mantener orden original</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="reverse">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="reverse">
+                                        <span>reverse - Invertir orden</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="half_shift">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="half_shift">
+                                        <span>half_shift - Mover segunda mitad al frente</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="reverse_half_shift">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="reverse_half_shift">
+                                        <span>reverse_half_shift - Invertir cada mitad y concatenar</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="pair_flip">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="pair_flip">
+                                        <span>pair_flip - Intercambiar cada par [1,2,3,4,…] → [2,1,4,3,…]</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="inner_outer">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="inner_outer">
+                                        <span>inner_outer - Distribución clásica de bracket: 1 vs N, 2 vs N-1, etc.</span>
+                                    </div>
+                                    <!-- Métodos para grupos -->
+                                    <div class="list-group-item d-flex align-items-center" data-value="groups.effort_balanced">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="groups.effort_balanced">
+                                        <span>groups.effort_balanced - Distribuir semillas para equilibrar fuerzas</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="groups.seed_optimized">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="groups.seed_optimized">
+                                        <span>groups.seed_optimized - Distribución "serpiente" para minimizar colisiones tempranas</span>
+                                    </div>
+                                    <div class="list-group-item d-flex align-items-center" data-value="groups.bracket_optimized">
+                                        <span class="me-2 handle" style="cursor: grab;">☰</span>
+                                        <input class="form-check-input me-2 seedOrdering-checkbox" type="checkbox" value="groups.bracket_optimized">
+                                        <span>groups.bracket_optimized - Optimizado para que los mejores se enfrenten lo más tarde posible</span>
+                                    </div>
+                                </div>
+                                <small class="form-text text-muted">Selecciona los métodos de ordenamiento que deseas aplicar y arrastra para cambiar su orden (el orden importa).</small>
                             </div>
 
                             <!-- size -->
                             <div class="mb-3">
-                                <label for="size" class="form-label">size</label>
+                                <label for="size" class="form-label">Número de participantes</label>
                                 <input type="number" class="form-control" id="size" name="size" min="1" placeholder="Ej. 8">
                                 <small class="form-text text-muted">Número de participantes (generalmente se deduce de la lista, pero puede forzarse).</small>
+                                <small class="form-text text-muted">Se puede establecer sin indicar participantes para registrarlos mas adelante</small>
                             </div>
 
                             <!-- skipFirstRound -->
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="skipFirstRound" name="skipFirstRound">
-                                <label class="form-check-label" for="skipFirstRound">skipFirstRound</label>
+                                <label class="form-check-label" for="skipFirstRound">Saltar primera ronda</label></br>
                                 <small class="form-text text-muted">Saltar la primera ronda del bracket superior en doble eliminación.</small>
                             </div>
                         </div>
@@ -254,18 +294,38 @@
             draggable: '.list-group-item'
         });
 
-        // Construir el campo seeding al enviar el formulario
+        // Inicializar Sortable para seedOrderingList
+        const seedOrderingList = document.getElementById('seedOrderingList');
+        new Sortable(seedOrderingList, {
+            animation: 150,
+            handle: '.handle',
+            draggable: '.list-group-item'
+        });
+
+        // Construir los campos ocultos al enviar el formulario
         const form = document.getElementById('formCrearTorneo');
         form.addEventListener('submit', function(e) {
-            const items = participantesList.querySelectorAll('.list-group-item');
+            // Recolectar participantes (seeding)
+            const itemsParticipantes = participantesList.querySelectorAll('.list-group-item');
             const seeding = [];
-            items.forEach(item => {
+            itemsParticipantes.forEach(item => {
                 const checkbox = item.querySelector('.participante-checkbox');
                 if (checkbox.checked) {
                     seeding.push(checkbox.value);
                 }
             });
             document.getElementById('seedingInput').value = JSON.stringify(seeding);
+
+            // Recolectar seedOrdering
+            const itemsSeed = seedOrderingList.querySelectorAll('.list-group-item');
+            const seedOrdering = [];
+            itemsSeed.forEach(item => {
+                const checkbox = item.querySelector('.seedOrdering-checkbox');
+                if (checkbox.checked) {
+                    seedOrdering.push(checkbox.value);
+                }
+            });
+            document.getElementById('seedOrderingInput').value = JSON.stringify(seedOrdering);
         });
 
         // Modal de eliminar
