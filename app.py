@@ -932,10 +932,18 @@ def gestion_brackets(torneo_id):
     stage_id = torneo.torneo_id_externo
 
     try:
+        # Obtener datos del stage
+        # Se espera que la API devuelva un objeto con las claves: stage, match, match_game, participant
         response = requests.get(f"{API_TORNEOS_URL}/stages/{stage_id}")
         response.raise_for_status()
         data = response.json()
-        # Se espera que la API devuelva un objeto con las claves: stage, match, match_game, participant
+
+        # Obtener enfrentamientos actuales
+        response_matches = requests.get(f"{API_TORNEOS_URL}/stage/{stage_id}/current-matches")
+        response_matches.raise_for_status()
+        current_matches_data = response_matches.json()
+        current_matches = current_matches_data.get('currentMatches', [])
+
     except requests.exceptions.RequestException as e:
         flash(f'Error al obtener datos del torneo: {str(e)}', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
@@ -945,7 +953,8 @@ def gestion_brackets(torneo_id):
 
     return render_template('torneo_brackets.html', 
                            torneo=torneo, 
-                           stage_data=data)
+                           stage_data=data,
+                           current_matches=current_matches)
 
 @app.route('/evento/torneo/brackets/matchups', methods=['GET', 'POST'])
 def gestion_brackets_matchups():

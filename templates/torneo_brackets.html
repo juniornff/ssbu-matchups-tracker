@@ -10,6 +10,19 @@
     <a href="{{ url_for('gestion_torneos', evento_id=torneo.evento_id) }}" class="btn btn-secondary">⬅️ Volver a Torneos</a>
 </div>
 
+{% if current_matches and current_matches|length > 0 %}
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Enfrentamientos actuales</h5>
+    </div>
+    <div class="card-body">
+        <ul class="list-group" id="currentMatchesList">
+            <!-- Se llenará con JavaScript -->
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 <!-- Contenedor donde se renderizará el bracket -->
 <div class="brackets-viewer" id="bracketsViewer"></div>
 
@@ -21,8 +34,33 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Datos recibidos desde el backend (en formato JSON)
         const stageData = {{ stage_data|tojson }};
+        const currentMatches = {{ current_matches|tojson }};
 
-        // Verificar que los datos tengan la estructura esperada
+        // Crear un mapa de participantes: id -> nombre
+        const participantMap = {};
+        if (stageData && stageData.participant) {
+            stageData.participant.forEach(p => {
+                participantMap[p.id] = p.name;
+            });
+        }
+
+        // Mostrar enfrentamientos actuales si hay
+        if (currentMatches && currentMatches.length > 0) {
+            const list = document.getElementById('currentMatchesList');
+            list.innerHTML = '';
+            currentMatches.forEach(match => {
+                const opp1Id = match.opponent1 ? match.opponent1.id : null;
+                const opp2Id = match.opponent2 ? match.opponent2.id : null;
+                const name1 = opp1Id !== null ? (participantMap[opp1Id] || 'Desconocido') : 'BYE';
+                const name2 = opp2Id !== null ? (participantMap[opp2Id] || 'Desconocido') : 'BYE';
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = `${name1} vs ${name2}`;
+                list.appendChild(li);
+            });
+        }
+
+        // Renderizar bracket
         if (stageData && stageData.stage && stageData.match && stageData.match_game && stageData.participant) {
             window.bracketsViewer.render({
                 stages: stageData.stage,
