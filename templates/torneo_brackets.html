@@ -1,6 +1,17 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+    /* Para que los modales tengan scroll si es necesario */
+    .modal-body {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    .personaje-select {
+        min-width: 200px;
+    }
+</style>
+
 <h2>Bracket del Torneo: {{ torneo.nombre }}</h2>
 <p class="text-muted">Evento: {{ torneo.evento.fecha }}</p>
 <hr>
@@ -26,17 +37,120 @@
 <!-- Contenedor donde se renderizará el bracket -->
 <div class="brackets-viewer" id="bracketsViewer"></div>
 
-<!-- Incluir CSS y JS de brackets-viewer -->
+<!-- MODAL para match sin hijos (child_count = 0) -->
+<div class="modal fade" id="modalMatchSinHijos" tabindex="-1" aria-labelledby="modalMatchSinHijosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('gestion_brackets', torneo_id=torneo.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalMatchSinHijosLabel">Editar resultado del match</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="match_id" id="matchSinHijosId">
+                    <input type="hidden" name="tipo" value="sin_hijos">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" id="opponent1NameSinHijos"></label>
+                            <div class="mb-2">
+                                <label>Puntaje</label>
+                                <input type="number" class="form-control" name="opponent1_score" min="0" value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label>Personaje</label>
+                                <select class="form-select personaje-select" name="opponent1_character" id="opponent1CharacterSinHijos">
+                                    <option value="">Selecciona</option>
+                                    <!-- Las opciones se llenarán con JavaScript desde todosPersonajes -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" id="opponent2NameSinHijos"></label>
+                            <div class="mb-2">
+                                <label>Puntaje</label>
+                                <input type="number" class="form-control" name="opponent2_score" min="0" value="0">
+                            </div>
+                            <div class="mb-2">
+                                <label>Personaje</label>
+                                <select class="form-select personaje-select" name="opponent2_character" id="opponent2CharacterSinHijos">
+                                    <option value="">Selecciona</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL para match con hijos (child_count > 0) -->
+<div class="modal fade" id="modalMatchConHijos" tabindex="-1" aria-labelledby="modalMatchConHijosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('gestion_brackets', torneo_id=torneo.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalMatchConHijosLabel">Editar juegos del match</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="match_id" id="matchConHijosId">
+                    <input type="hidden" name="tipo" value="con_hijos">
+                    <div id="hijosContainer">
+                        <!-- Aquí se generarán dinámicamente los campos para cada hijo -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- CSS y JS de brackets-viewer y TomSelect -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css" />
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.css">
+<script src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 
 <script>
+    // Función similar a la de matchups.html para esperar a que TomSelect esté listo
+    window.tomSelectReady = false;
+    window.tomSelectCallbacks = [];
+
+    function onTomSelectReady(callback) {
+        if (window.tomSelectReady) {
+            callback();
+        } else {
+            window.tomSelectCallbacks.push(callback);
+        }
+    }
+
+    // Detectar cuando TomSelect está cargado
+    function checkTomSelect() {
+        if (typeof TomSelect !== 'undefined') {
+            window.tomSelectReady = true;
+            window.tomSelectCallbacks.forEach(cb => cb());
+            window.tomSelectCallbacks = [];
+        } else {
+            setTimeout(checkTomSelect, 50);
+        }
+    }
+    checkTomSelect();
+
     document.addEventListener('DOMContentLoaded', function() {
-        // Datos recibidos desde el backend (en formato JSON)
+        // Datos recibidos del backend
         const stageData = {{ stage_data|tojson }};
         const currentMatches = {{ current_matches|tojson }};
+        const todosPersonajes = {{ todos_personajes|tojson }};  // lista de {id, nombre}
 
-        // Crear un mapa de participantes: id -> nombre
+        // Mapa de participantes
         const participantMap = {};
         if (stageData && stageData.participant) {
             stageData.participant.forEach(p => {
@@ -44,7 +158,7 @@
             });
         }
 
-        // Mostrar enfrentamientos actuales si hay
+        // Mostrar enfrentamientos actuales
         if (currentMatches && currentMatches.length > 0) {
             const list = document.getElementById('currentMatchesList');
             list.innerHTML = '';
@@ -72,6 +186,155 @@
             console.error('Los datos del torneo no tienen la estructura esperada:', stageData);
             document.getElementById('bracketsViewer').innerHTML = '<div class="alert alert-danger">Error: Los datos del torneo no son válidos para mostrar el bracket.</div>';
         }
+
+        // Construir un mapa de matchGames por parent_id (id del match)
+        const matchGamesByParent = {};
+        if (stageData.match_game) {
+            stageData.match_game.forEach(mg => {
+                if (!matchGamesByParent[mg.parent_id]) {
+                    matchGamesByParent[mg.parent_id] = [];
+                }
+                matchGamesByParent[mg.parent_id].push(mg);
+            });
+        }
+
+        // Función para llenar un select con opciones de personajes y pre-seleccionar un valor
+        function fillCharacterSelect(selectElement, selectedValue) {
+            selectElement.innerHTML = '<option value="">Selecciona</option>';
+            todosPersonajes.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nombre;
+                if (selectedValue && p.id == selectedValue) {
+                    option.selected = true;
+                }
+                selectElement.appendChild(option);
+            });
+        }
+
+        // Función para inicializar TomSelect en un contenedor
+        function initTomSelect(containerSelector) {
+            onTomSelectReady(() => {
+                document.querySelectorAll(containerSelector + ' .personaje-select').forEach(el => {
+                    if (!el.tomselect) {
+                        new TomSelect(el, {
+                            valueField: 'id',
+                            labelField: 'nombre',
+                            searchField: 'nombre',
+                            options: todosPersonajes,
+                            create: false,
+                            placeholder: 'Selecciona personaje',
+                            render: {
+                                option: function(item, escape) {
+                                    return '<div>' + escape(item.nombre) + '</div>';
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        // Función para sincronizar los valores de TomSelect con los selects nativos
+        function syncTomSelectValues(containerSelector) {
+            document.querySelectorAll(containerSelector + ' .personaje-select').forEach(el => {
+                if (el.tomselect) {
+                    el.value = el.tomselect.getValue();
+                }
+            });
+        }
+
+        // Añadir event listeners a los formularios para sincronizar antes de enviar
+        document.getElementById('modalMatchSinHijos').querySelector('form').addEventListener('submit', function(e) {
+            syncTomSelectValues('#modalMatchSinHijos');
+        });
+
+        document.getElementById('modalMatchConHijos').querySelector('form').addEventListener('submit', function(e) {
+            syncTomSelectValues('#modalMatchConHijos');
+        });
+
+        // Manejador de clic en un match
+        window.bracketsViewer.onMatchClicked = async (match) => {
+            console.log('Match clicked:', match);
+            const matchId = match.id;
+            const childCount = match.child_count || 0;
+            const opponent1 = match.opponent1 ? match.opponent1 : null;
+            const opponent2 = match.opponent2 ? match.opponent2 : null;
+
+            if (childCount === 0) {
+                // Modal sin hijos
+                const modal = new bootstrap.Modal(document.getElementById('modalMatchSinHijos'));
+                document.getElementById('matchSinHijosId').value = matchId;
+                document.getElementById('opponent1NameSinHijos').textContent = opponent1 ? (participantMap[opponent1.id] || 'Desconocido') : 'BYE';
+                document.getElementById('opponent2NameSinHijos').textContent = opponent2 ? (participantMap[opponent2.id] || 'Desconocido') : 'BYE';
+                // Poner puntajes existentes si los hay
+                document.querySelector('input[name="opponent1_score"]').value = opponent1 && opponent1.score !== undefined ? opponent1.score : 0;
+                document.querySelector('input[name="opponent2_score"]').value = opponent2 && opponent2.score !== undefined ? opponent2.score : 0;
+                // Obtener personajes previos si existen (asumiendo que están en opponent1.personaje y opponent2.personaje)
+                const prevChar1 = opponent1 && opponent1.personaje ? opponent1.personaje : '';
+                const prevChar2 = opponent2 && opponent2.personaje ? opponent2.personaje : '';
+                // Llenar selects con personajes y pre-seleccionar los valores previos
+                fillCharacterSelect(document.getElementById('opponent1CharacterSinHijos'), prevChar1);
+                fillCharacterSelect(document.getElementById('opponent2CharacterSinHijos'), prevChar2);
+                // Inicializar TomSelect
+                setTimeout(() => {
+                    initTomSelect('#modalMatchSinHijos');
+                }, 100);
+                modal.show();
+            } else {
+                // Modal con hijos
+                const matchGames = matchGamesByParent[matchId] || [];
+                if (matchGames.length === 0) {
+                    alert('No hay juegos asociados a este match');
+                    return;
+                }
+                const modal = new bootstrap.Modal(document.getElementById('modalMatchConHijos'));
+                document.getElementById('matchConHijosId').value = matchId;
+                const container = document.getElementById('hijosContainer');
+                container.innerHTML = ''; // Limpiar
+
+                // Generar campos para cada juego hijo
+                matchGames.forEach((game, index) => {
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'card mb-3';
+                    // Obtener puntajes actuales si existen
+                    const score1 = game.opponent1 && game.opponent1.score !== undefined ? game.opponent1.score : 0;
+                    const score2 = game.opponent2 && game.opponent2.score !== undefined ? game.opponent2.score : 0;
+                    // Obtener personajes previos si existen
+                    const prevChar1 = game.opponent1 && game.opponent1.personaje ? game.opponent1.personaje : '';
+                    const prevChar2 = game.opponent2 && game.opponent2.personaje ? game.opponent2.personaje : '';
+                    gameDiv.innerHTML = `
+                        <div class="card-header">Juego ${index + 1}</div>
+                        <div class="card-body">
+                            <input type="hidden" name="match_game_id_${index}" value="${game.id}">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label>${participantMap[opponent1.id] || 'Desconocido'} - Puntaje</label>
+                                    <input type="number" class="form-control" name="opponent1_score_${index}" min="0" value="${score1}">
+                                    <label>Personaje</label>
+                                    <select class="form-select personaje-select" name="opponent1_character_${index}" id="opponent1Char_${index}"></select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label>${participantMap[opponent2.id] || 'Desconocido'} - Puntaje</label>
+                                    <input type="number" class="form-control" name="opponent2_score_${index}" min="0" value="${score2}">
+                                    <label>Personaje</label>
+                                    <select class="form-select personaje-select" name="opponent2_character_${index}" id="opponent2Char_${index}"></select>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(gameDiv);
+                    // Llenar selects de personajes con pre-selección
+                    fillCharacterSelect(document.getElementById(`opponent1Char_${index}`), prevChar1);
+                    fillCharacterSelect(document.getElementById(`opponent2Char_${index}`), prevChar2);
+                });
+                // Inicializar TomSelect en los nuevos selects
+                setTimeout(() => {
+                    initTomSelect('#modalMatchConHijos');
+                }, 100);
+                modal.show();
+            }
+        };
     });
 </script>
 {% endblock %}

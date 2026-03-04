@@ -931,6 +931,113 @@ def gestion_brackets(torneo_id):
     torneo = Torneo.query.get_or_404(torneo_id)
     stage_id = torneo.torneo_id_externo
 
+    if request.method == 'POST':
+        tipo = request.form.get('tipo')
+        match_id = request.form.get('match_id')
+        if not match_id:
+            flash('ID de match no proporcionado', 'danger')
+            return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+
+        if tipo == 'sin_hijos':
+            score1 = request.form.get('opponent1_score', type=int)
+            score2 = request.form.get('opponent2_score', type=int)
+            char1 = request.form.get('opponent1_character', type=int)
+            char2 = request.form.get('opponent2_character', type=int)
+
+            if score1 > score2:
+                result1, result2 = 'win', 'loss'
+            elif score2 > score1:
+                result1, result2 = 'loss', 'win'
+            else:
+                result1, result2 = 'draw', 'draw'
+                flash('Los scores no pueden ser iguales en un match sin hijos', 'warning')
+                return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+
+            payload = {
+                'opponent1': {
+                    'score': score1,
+                    'result': result1,
+                    'personaje': char1
+                },
+                'opponent2': {
+                    'score': score2,
+                    'result': result2,
+                    'personaje': char2
+                }
+            }
+            try:
+                response = requests.patch(f"{API_TORNEOS_URL}/matches/{match_id}", json=payload)
+                response.raise_for_status()
+                flash('Match actualizado correctamente', 'success')
+            except requests.exceptions.RequestException as e:
+                flash(f'Error al actualizar match: {str(e)}', 'danger')
+
+        elif tipo == 'con_hijos':
+            # Obtener todos los índices de juegos hijos
+            game_indices = []
+            for key in request.form.keys():
+                if key.startswith('match_game_id_'):
+                    idx = key.replace('match_game_id_', '')
+                    game_indices.append(int(idx))
+            if not game_indices:
+                flash('No se recibieron juegos hijos', 'danger')
+                return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+
+            game_indices.sort()  # Procesar en orden
+            total_games = len(game_indices)
+            victorias_op1 = 0
+            victorias_op2 = 0
+            victorias_necesarias = (total_games + 1) // 2  # ceil((total+1)/2)
+
+            for idx in game_indices:
+                # Si ya hay un ganador, dejar de procesar
+                if victorias_op1 >= victorias_necesarias or victorias_op2 >= victorias_necesarias:
+                    break
+
+                game_id = request.form.get(f'match_game_id_{idx}')
+                score1 = request.form.get(f'opponent1_score_{idx}', type=int)
+                score2 = request.form.get(f'opponent2_score_{idx}', type=int)
+                char1 = request.form.get(f'opponent1_character_{idx}', type=int)
+                char2 = request.form.get(f'opponent2_character_{idx}', type=int)
+
+                # Solo procesar si se ha jugado (score != None)
+                if (score1 or score2):
+                    if score1 > score2:
+                        result1, result2 = 'win', 'loss'
+                        victorias_op1 += 1
+                    elif score2 > score1:
+                        result1, result2 = 'loss', 'win'
+                        victorias_op2 += 1
+                    else:
+                        # Empate: no se cuenta como victoria, pero se puede enviar igual si hay personajes
+                        # Para evitar bucles, no sumamos victorias, pero sí enviamos
+                        result1, result2 = 'draw', 'draw'  # O podríamos no enviar
+                        # Por simplicidad, no enviamos empates
+                        continue
+
+                    payload = {
+                        'opponent1': {
+                            'score': score1,
+                            'result': result1,
+                            'personaje': char1
+                        },
+                        'opponent2': {
+                            'score': score2,
+                            'result': result2,
+                            'personaje': char2
+                        }
+                    }
+                    try:
+                        resp = requests.patch(f"{API_TORNEOS_URL}/match-games/{game_id}", json=payload)
+                        resp.raise_for_status()
+                    except requests.exceptions.RequestException as e:
+                        flash(f'Error al actualizar juego {game_id}: {str(e)}', 'danger')
+            flash('Juegos actualizados correctamente', 'success')
+        else:
+            flash('Tipo de actualización desconocido', 'danger')
+
+        return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+
     try:
         # Obtener datos del stage
         # Se espera que la API devuelva un objeto con las claves: stage, match, match_game, participant
@@ -951,17 +1058,15 @@ def gestion_brackets(torneo_id):
         flash(f'Error inesperado: {str(e)}', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
+    # Obtener lista de personajes como diccionarios
+    personajes = Personaje.query.order_by(Personaje.nombre).all()
+    todos_personajes = [{'id': p.id, 'nombre': p.nombre} for p in personajes]
+
     return render_template('torneo_brackets.html', 
                            torneo=torneo, 
                            stage_data=data,
-                           current_matches=current_matches)
-
-@app.route('/evento/torneo/brackets/matchups', methods=['GET', 'POST'])
-def gestion_brackets_matchups():
-    if request.method == 'POST':
-        return redirect(url_for('gestion_brackets_matchups'))
-
-    return render_template('torneo_matchup.html')
+                           current_matches=current_matches,
+                           todos_personajes=todos_personajes)
 
 # Estadisticas
 # Index Estadisticas
