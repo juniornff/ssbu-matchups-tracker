@@ -876,10 +876,25 @@ def gestion_torneos(evento_id):
             db.session.add(nuevo_torneo)
             db.session.commit()
             flash('Torneo creado exitosamente', 'success')
+        except requests.exceptions.HTTPError as e:
+            # Error HTTP con posible mensaje de error en JSON
+            # error_msg = f"Error HTTP {e.response.status_code}"
+            try:
+                error_data = e.response.json()
+                if 'error' in error_data:
+                    error_msg = f"{error_data['error']}"
+            except:
+                pass
+            flash(error_msg, 'danger')
+        except requests.exceptions.ConnectionError:
+            flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
+        except requests.exceptions.Timeout:
+            flash('Tiempo de espera agotado al conectar con la API.', 'danger')
         except requests.exceptions.RequestException as e:
             flash(f'Error al comunicarse con la API: {str(e)}', 'danger')
         except Exception as e:
             flash(f'Error inesperado: {str(e)}', 'danger')
+            db.session.rollback()
 
         return redirect(url_for('gestion_torneos', evento_id=evento_id))
 
@@ -900,7 +915,6 @@ def eliminar_torneo(torneo_id):
 
     torneo = Torneo.query.get_or_404(torneo_id)
 
-    # Verificar que el evento esté activo
     if not torneo.evento.activo:
         flash('El evento está bloqueado, no se puede eliminar el torneo', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
@@ -908,16 +922,26 @@ def eliminar_torneo(torneo_id):
     stage_id = torneo.torneo_id_externo
 
     try:
-        # Primero eliminar en la API
         response = requests.delete(f"{API_TORNEOS_URL}/stages/{stage_id}")
         if response.status_code not in (200, 204):
-            flash(f'Error al eliminar en la API: {response.status_code}', 'danger')
+            # Intentar obtener mensaje de error
+            # error_msg = f"Error HTTP {response.status_code}"
+            try:
+                error_data = response.json()
+                if 'error' in error_data:
+                    error_msg = f"{error_data['error']}"
+            except:
+                pass
+            flash(error_msg, 'danger')
             return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
-        # Luego eliminar de la base de datos
         db.session.delete(torneo)
         db.session.commit()
         flash('Torneo eliminado con éxito', 'success')
+    except requests.exceptions.ConnectionError:
+        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
+    except requests.exceptions.Timeout:
+        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
     except requests.exceptions.RequestException as e:
         flash(f'Error de conexión con la API: {str(e)}', 'danger')
     except Exception as e:
@@ -932,6 +956,10 @@ def gestion_brackets(torneo_id):
     stage_id = torneo.torneo_id_externo
 
     if request.method == 'POST':
+        if not torneo.evento.activo:
+            flash('El evento está bloqueado, no se puede modificar el torneo', 'danger')
+            return redirect(url_for('gestion_brackets', torneo_id=torneo.id))
+
         tipo = request.form.get('tipo')
         match_id = request.form.get('match_id')
         if not match_id:
@@ -949,7 +977,6 @@ def gestion_brackets(torneo_id):
             elif score2 > score1:
                 result1, result2 = 'loss', 'win'
             else:
-                result1, result2 = 'draw', 'draw'
                 flash('Los scores no pueden ser iguales en un match sin hijos', 'warning')
                 return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
@@ -969,11 +996,23 @@ def gestion_brackets(torneo_id):
                 response = requests.patch(f"{API_TORNEOS_URL}/matches/{match_id}", json=payload)
                 response.raise_for_status()
                 flash('Match actualizado correctamente', 'success')
+            except requests.exceptions.HTTPError as e:
+                # error_msg = f"Error HTTP {e.response.status_code}"
+                try:
+                    error_data = e.response.json()
+                    if 'error' in error_data:
+                        error_msg = f"{error_data['error']}"
+                except:
+                    pass
+                flash(error_msg, 'danger')
+            except requests.exceptions.ConnectionError:
+                flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
+            except requests.exceptions.Timeout:
+                flash('Tiempo de espera agotado al conectar con la API.', 'danger')
             except requests.exceptions.RequestException as e:
-                flash(f'Error al actualizar match: {str(e)}', 'danger')
+                flash(f'Error al comunicarse con la API: {str(e)}', 'danger')
 
         elif tipo == 'con_hijos':
-            # Obtener todos los índices de juegos hijos
             game_indices = []
             for key in request.form.keys():
                 if key.startswith('match_game_id_'):
@@ -983,14 +1022,14 @@ def gestion_brackets(torneo_id):
                 flash('No se recibieron juegos hijos', 'danger')
                 return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
-            game_indices.sort()  # Procesar en orden
+            game_indices.sort()
             total_games = len(game_indices)
             victorias_op1 = 0
             victorias_op2 = 0
-            victorias_necesarias = (total_games + 1) // 2  # ceil((total+1)/2)
+            victorias_necesarias = (total_games + 1) // 2
 
+            any_error = False
             for idx in game_indices:
-                # Si ya hay un ganador, dejar de procesar
                 if victorias_op1 >= victorias_necesarias or victorias_op2 >= victorias_necesarias:
                     break
 
@@ -1000,7 +1039,6 @@ def gestion_brackets(torneo_id):
                 char1 = request.form.get(f'opponent1_character_{idx}', type=int)
                 char2 = request.form.get(f'opponent2_character_{idx}', type=int)
 
-                # Solo procesar si se ha jugado (score != None)
                 if (score1 or score2):
                     if score1 > score2:
                         result1, result2 = 'win', 'loss'
@@ -1009,10 +1047,7 @@ def gestion_brackets(torneo_id):
                         result1, result2 = 'loss', 'win'
                         victorias_op2 += 1
                     else:
-                        # Empate: no se cuenta como victoria, pero se puede enviar igual si hay personajes
-                        # Para evitar bucles, no sumamos victorias, pero sí enviamos
-                        result1, result2 = 'draw', 'draw'  # O podríamos no enviar
-                        # Por simplicidad, no enviamos empates
+                        # Empate: no se procesa
                         continue
 
                     payload = {
@@ -1030,27 +1065,61 @@ def gestion_brackets(torneo_id):
                     try:
                         resp = requests.patch(f"{API_TORNEOS_URL}/match-games/{game_id}", json=payload)
                         resp.raise_for_status()
+                    except requests.exceptions.HTTPError as e:
+                        any_error = True
+                        # error_msg = f"Error al actualizar juego {game_id}: HTTP {e.response.status_code}"
+                        try:
+                            error_data = e.response.json()
+                            if 'error' in error_data:
+                                error_msg = f"{error_data['error']}"
+                        except:
+                            pass
+                        flash(error_msg, 'danger')
+                        break
+                    except requests.exceptions.ConnectionError:
+                        any_error = True
+                        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
+                        break
+                    except requests.exceptions.Timeout:
+                        any_error = True
+                        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
+                        break
                     except requests.exceptions.RequestException as e:
+                        any_error = True
                         flash(f'Error al actualizar juego {game_id}: {str(e)}', 'danger')
-            flash('Juegos actualizados correctamente', 'success')
+                        break
+            if not any_error:
+                flash('Juegos actualizados correctamente', 'success')
         else:
             flash('Tipo de actualización desconocido', 'danger')
 
         return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
     try:
-        # Obtener datos del stage
-        # Se espera que la API devuelva un objeto con las claves: stage, match, match_game, participant
         response = requests.get(f"{API_TORNEOS_URL}/stages/{stage_id}")
         response.raise_for_status()
         data = response.json()
 
-        # Obtener enfrentamientos actuales
         response_matches = requests.get(f"{API_TORNEOS_URL}/stage/{stage_id}/current-matches")
         response_matches.raise_for_status()
         current_matches_data = response_matches.json()
         current_matches = current_matches_data.get('currentMatches', [])
-
+    except requests.exceptions.HTTPError as e:
+        # error_msg = f"Error HTTP {e.response.status_code}"
+        try:
+            error_data = e.response.json()
+            if 'error' in error_data:
+                error_msg = f"{error_data['error']}"
+        except:
+            pass
+        flash(error_msg, 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+    except requests.exceptions.ConnectionError:
+        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+    except requests.exceptions.Timeout:
+        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
     except requests.exceptions.RequestException as e:
         flash(f'Error al obtener datos del torneo: {str(e)}', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
@@ -1058,7 +1127,6 @@ def gestion_brackets(torneo_id):
         flash(f'Error inesperado: {str(e)}', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
-    # Obtener lista de personajes como diccionarios
     personajes = Personaje.query.order_by(Personaje.nombre).all()
     todos_personajes = [{'id': p.id, 'nombre': p.nombre} for p in personajes]
 
