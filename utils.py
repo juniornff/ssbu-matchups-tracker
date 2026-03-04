@@ -1,6 +1,8 @@
 from collections import defaultdict, deque
-from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Match
+from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match
 import random
+import requests
+import json
 from flask import current_app
 
 
@@ -91,6 +93,43 @@ def actualizar_personajes_participantes_logic(app):
         app.logger.info("============================")
 
     db.session.commit()
+
+def obtener_standings_torneo(torneo, api_url):
+    """
+    Obtiene los standings de un torneo desde la API.
+    Retorna un diccionario con los datos si éxito, o un dict con 'error'.
+    Además, guarda los resultados en la base de datos si no existen.
+    """
+    stage_id = torneo.torneo_id_externo
+    try:
+        response = requests.get(f"{api_url}/tournaments/{stage_id}/standings")
+        if response.status_code == 200:
+            standings_data = response.json()
+            # Guardar en BD si no existen resultados
+            resultados_existentes = TorneoResultado.query.filter_by(torneo_id=torneo.id).count()
+            if resultados_existentes == 0 and 'standings' in standings_data:
+                for item in standings_data['standings']:
+                    participante = Participante.query.filter_by(nickname=item['name']).first()
+                    if participante:
+                        resultado = TorneoResultado(
+                            torneo_id=torneo.id,
+                            participante_id=participante.id,
+                            ranking=item['rank']
+                        )
+                        db.session.add(resultado)
+                db.session.commit()
+            return standings_data
+        else:
+            if response.status_code == 404:
+                return {'error': 'No disponible (torneo no encontrado)'}
+            if response.status_code == 500:
+                return {'error': 'No disponible (Completar todos los partidos del torneo)'}
+    except requests.exceptions.ConnectionError:
+        return {'error': 'Error de conexión con la API'}
+    except requests.exceptions.Timeout:
+        return {'error': 'Tiempo de espera agotado'}
+    except requests.exceptions.RequestException as e:
+        return {'error': f'Error: {str(e)}'}
 
 def generar_round_robin(participantes_ids):
     """Genera todos los enfrentamientos posibles entre participantes"""

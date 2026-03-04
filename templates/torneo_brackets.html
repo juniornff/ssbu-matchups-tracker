@@ -34,6 +34,79 @@
 </div>
 {% endif %}
 
+{% if standings_data and not standings_data.error %}
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">Resultados finales 🏆</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Posición</th>
+                        <th>Participante</th>
+                        {% if standings_data.stageType == 'round_robin' %}
+                        <th>PJ</th>
+                        <th>PG</th>
+                        <th>PP</th>
+                        <th>PE</th>
+                        <th>Pts</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if standings_data.stageType == 'round_robin' %}
+                        {% for item in standings_data.standings|sort(attribute='rank') %}
+                        <tr class="{% if item.rank == 1 %}table-warning{% elif item.rank == 2 %}table-secondary{% elif item.rank == 3 %}table-danger{% endif %}">
+                            <td>
+                                {% if item.rank == 1 %}🥇
+                                {% elif item.rank == 2 %}🥈
+                                {% elif item.rank == 3 %}🥉
+                                {% endif %}
+                                <span class="badge 
+                                    {% if item.rank == 1 %}bg-warning text-dark
+                                    {% elif item.rank == 2 %}bg-secondary
+                                    {% elif item.rank == 3 %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ item.rank }}
+                                </span>
+                            </td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.played }}</td>
+                            <td>{{ item.wins }}</td>
+                            <td>{{ item.losses }}</td>
+                            <td>{{ item.draws }}</td>
+                            <td><strong>{{ item.points }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        {% for item in standings_data.standings|sort(attribute='rank') %}
+                        <tr class="{% if item.rank == 1 %}table-warning{% elif item.rank == 2 %}table-secondary{% elif item.rank == 3 %}table-danger{% endif %}">
+                            <td>
+                                {% if item.rank == 1 %}🥇
+                                {% elif item.rank == 2 %}🥈
+                                {% elif item.rank == 3 %}🥉
+                                {% endif %}
+                                <span class="badge 
+                                    {% if item.rank == 1 %}bg-warning text-dark
+                                    {% elif item.rank == 2 %}bg-secondary
+                                    {% elif item.rank == 3 %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ item.rank }}
+                                </span>
+                            </td>
+                            <td>{{ item.name }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Contenedor donde se renderizará el bracket -->
 <div class="brackets-viewer" id="bracketsViewer"></div>
 

@@ -40,6 +40,7 @@
                 <td>{{ t.fecha_creacion.strftime('%Y-%m-%d %H:%M') }}</td>
                 <td>
                     <a href="{{ url_for('gestion_brackets', torneo_id=t.id) }}" class="btn btn-sm btn-primary">Brackets</a>
+                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#resultadosModal" data-torneo-id="{{ t.id }}" data-torneo-nombre="{{ t.nombre }}">Resultados 👑</button>
                     <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#eliminarTorneoModal" data-id="{{ t.id }}" data-nombre="{{ t.nombre }}">
                         ❌
                     </button>
@@ -278,6 +279,26 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Resultados -->
+<div class="modal fade" id="resultadosModal" tabindex="-1" aria-labelledby="resultadosModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultadosModalLabel">Resultados</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="list-group" id="resultadosLista">
+                    <!-- Se llenará con JavaScript -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -339,6 +360,39 @@
             document.getElementById('torneoIdEliminar').value = id;
             document.getElementById('torneoNombreEliminar').textContent = nombre;
         });
+    });
+
+    // Modal de resultados
+    const resultadosModal = document.getElementById('resultadosModal');
+    resultadosModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const torneoId = button.getAttribute('data-torneo-id');
+        const torneoNombre = button.getAttribute('data-torneo-nombre');
+        const standingsData = {{ standings|tojson }}; // Datos pasados desde el backend
+
+        // Actualizar título del modal
+        document.getElementById('resultadosModalLabel').textContent = 'Resultados - ' + torneoNombre;
+
+        const lista = document.getElementById('resultadosLista');
+        lista.innerHTML = ''; // Limpiar
+
+        const data = standingsData[torneoId];
+        if (!data) {
+            lista.innerHTML = '<li class="list-group-item text-muted">No hay datos de resultados</li>';
+        } else if (data.error) {
+            lista.innerHTML = '<li class="list-group-item text-danger">' + data.error + '</li>';
+        } else if (data.standings) {
+            // Ordenar por ranking ascendente
+            const sorted = data.standings.sort((a, b) => a.rank - b.rank);
+            sorted.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.innerHTML = `<span>${item.name}</span> <span class="badge bg-primary rounded-pill">#${item.rank}</span>`;
+                lista.appendChild(li);
+            });
+        } else {
+            lista.innerHTML = '<li class="list-group-item text-muted">Formato de datos no reconocido</li>';
+        }
     });
 </script>
 {% endblock %}

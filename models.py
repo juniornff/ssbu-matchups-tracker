@@ -50,6 +50,16 @@ class Torneo(db.Model):
     # Relación con Evento
     evento = db.relationship('Evento', backref=db.backref('torneos', lazy=True))
 
+class TorneoResultado(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    torneo_id = db.Column(db.Integer, db.ForeignKey('torneo.id'), nullable=False)
+    participante_id = db.Column(db.Integer, db.ForeignKey('participante.id'), nullable=False)
+    ranking = db.Column(db.Integer, nullable=False)
+
+    # Relaciones
+    torneo = db.relationship('Torneo', backref=db.backref('resultados', lazy=True))
+    participante = db.relationship('Participante', backref=db.backref('resultados_torneo', lazy=True))
+
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ronda_id = db.Column(db.Integer, db.ForeignKey('ronda.id'))

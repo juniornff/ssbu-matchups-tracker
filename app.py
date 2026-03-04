@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 import os
-from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, Match
+from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match
 import utils
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -899,7 +899,13 @@ def gestion_torneos(evento_id):
         return redirect(url_for('gestion_torneos', evento_id=evento_id))
 
     torneos = Torneo.query.filter_by(evento_id=evento_id).all()
-    return render_template('torneos.html', evento=evento, torneos=torneos)
+    standings_dict = {}
+
+    for torneo in torneos:
+        resultado = utils.obtener_standings_torneo(torneo, API_TORNEOS_URL)
+        standings_dict[torneo.id] = resultado
+    
+    return render_template('torneos.html', evento=evento, torneos=torneos, standings=standings_dict)
 
 @app.route('/evento/torneo/editar', methods=['POST'])
 def editar_torneo():
@@ -1130,11 +1136,14 @@ def gestion_brackets(torneo_id):
     personajes = Personaje.query.order_by(Personaje.nombre).all()
     todos_personajes = [{'id': p.id, 'nombre': p.nombre} for p in personajes]
 
+    standings_data = utils.obtener_standings_torneo(torneo, API_TORNEOS_URL)
+
     return render_template('torneo_brackets.html', 
                            torneo=torneo, 
                            stage_data=data,
                            current_matches=current_matches,
-                           todos_personajes=todos_personajes)
+                           todos_personajes=todos_personajes,
+                           standings_data=standings_data)
 
 # Estadisticas
 # Index Estadisticas
