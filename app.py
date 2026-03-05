@@ -611,12 +611,6 @@ def eliminar_ronda(id):
     return redirect(url_for('gestion_rondas', evento_id=evento_id))
 
 # Matchups
-# Test Matchups
-@app.route('/evento/ronda/test_verificaciones/<int:ronda_id>')
-def test_verificaciones(ronda_id):
-    ronda = Ronda.query.get_or_404(ronda_id)
-    return render_template('test_verificaciones.html', ronda=ronda)
-
 # Index Matchups
 @app.route('/evento/ronda/matchups/<int:ronda_id>', methods=['GET', 'POST'])
 def gestion_matchups(ronda_id):
@@ -914,18 +908,16 @@ def editar_torneo():
 @app.route('/evento/torneo/eliminar/<int:torneo_id>', methods=['POST'])
 def eliminar_torneo(torneo_id):
     codigo = request.form.get('codigo_secreto', '')
-
+    torneo = Torneo.query.get_or_404(torneo_id)
+    stage_id = torneo.torneo_id_externo
+    
     if codigo != Codigo_Secreto:
         flash('Código secreto incorrecto', 'danger')
-        return redirect(url_for('gestion_torneos'))
-
-    torneo = Torneo.query.get_or_404(torneo_id)
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
     if not torneo.evento.activo:
         flash('El evento está bloqueado, no se puede eliminar el torneo', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-
-    stage_id = torneo.torneo_id_externo
 
     try:
         response = requests.delete(f"{API_TORNEOS_URL}/stages/{stage_id}")
@@ -941,6 +933,9 @@ def eliminar_torneo(torneo_id):
             flash(error_msg, 'danger')
             return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
+        # Eliminar resultados del torneo en BD
+        TorneoResultado.query.filter_by(torneo_id=torneo.id).delete()
+        # Eliminar torneo
         db.session.delete(torneo)
         db.session.commit()
         flash('Torneo eliminado con éxito', 'success')
