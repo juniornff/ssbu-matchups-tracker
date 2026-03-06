@@ -5,11 +5,11 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 ## Features
 
 - Participant management (registration, deactivation, reactivation).
-- Complete SSBU character catalog. (images used come from [spriters-resource](https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/)
+- Complete SSBU character catalog. (images used come from [spriters-resource](https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/))
 - Event creation and attendance registration.
 - Automatic round generation with Round Robin system.
 - Match results recording (matchups) per round (best of 5).
-- Tournament Brackets Engine by Integrating the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library through a custom-built REST API (later i will publish the repo)
+- Tournament Brackets Engine by Integrating the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library through a [custom-built REST API](https://github.com/juniornff/brackets-manager-server).
 - Detailed statistics: win rates by player, by character, and against opponents.
 - Individual history for each participant.
 - Current round configuration for quick access to ongoing matches.
@@ -23,7 +23,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - **Database**: SQLite (with SQLAlchemy)
 - **Frontend**: Bootstrap 5, Tom Select (for enhanced selects)
 - **Task scheduling**: APScheduler
-- **APIs Used**: Custom-built REST API for the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library
+- **APIs Used**: [Custom-built REST API](https://github.com/juniornff/brackets-manager-server) for the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library
 - **CI/CD**: GitHub Actions, Docker, GitHub Container Registry (ghcr.io)
 
 ## Future Plans
