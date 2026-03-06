@@ -5,7 +5,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 ## Features
 
 - Participant management (registration, deactivation, reactivation).
-- Complete SSBU character catalog.
+- Complete SSBU character catalog. (images used come from https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/)
 - Event creation and attendance registration.
 - Automatic round generation with Round Robin system.
 - Match results recording (matchups) per round (best of 5).
