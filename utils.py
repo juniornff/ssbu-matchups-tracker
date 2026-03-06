@@ -155,8 +155,31 @@ def calcular_winrates(participantes, personajes):
             'general': {},
             'por_personaje': defaultdict(lambda: defaultdict(dict)),
             'contra_oponente': defaultdict(lambda: defaultdict(dict))
+        },
+        'torneos': {
+            'general': {},
+            'por_personaje': defaultdict(lambda: defaultdict(dict)),
+            'por_personaje_parcial': defaultdict(lambda: defaultdict(dict)),
+            'contra_oponente': defaultdict(lambda: defaultdict(dict))
         }
     }
+
+    api_url = current_app.config.get('API_TORNEOS_URL', 'http://localhost:3000')
+
+    # Obtener todos los torneos que tienen resultados (para limitar peticiones)
+    torneos_con_resultados = db.session.query(Torneo).join(TorneoResultado).distinct().all()
+    torneos_data_cache = {}  # clave: torneo.id, valor: datos de API o None si error
+
+    for torneo in torneos_con_resultados:
+        stage_id = torneo.torneo_id_externo
+        try:
+            response = requests.get(f"{api_url}/stages/{stage_id}", timeout=5)
+            if response.status_code == 200:
+                torneos_data_cache[torneo.id] = response.json()
+            else:
+                torneos_data_cache[torneo.id] = None
+        except requests.exceptions.RequestException:
+            torneos_data_cache[torneo.id] = None
 
     for p in participantes:
         # Estadísticas de partidos
@@ -325,6 +348,130 @@ def calcular_winrates(participantes, personajes):
                     'jugadas': data['jugadas'],
                     'winrate': (data['ganadas'] / data['jugadas'] * 100) if data['jugadas'] > 0 else 0
                 }
+        
+        # Inicializar estructuras para torneos
+        stats['torneos']['general'][p.id] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
+        stats['torneos']['por_personaje'][p.id] = {}
+        stats['torneos']['por_personaje_parcial'][p.id] = {}
+        stats['torneos']['contra_oponente'][p.id] = {}
+
+        # Obtener resultados de torneos de este participante
+        resultados = TorneoResultado.query.filter_by(participante_id=p.id).all()
+        for res in resultados:
+            torneo_id = res.torneo_id
+            ranking = res.ranking
+            stats['torneos']['general'][p.id]['jugados'] += 1
+            if ranking == 1:
+                stats['torneos']['general'][p.id]['ganados'] += 1
+
+            data = torneos_data_cache.get(torneo_id)
+            if not data:
+                continue
+
+            # Buscar el id del participante en los datos de la API
+            participant_id_api = None
+            for part in data.get('participant', []):
+                if part['name'] == p.nickname:
+                    participant_id_api = part['id']
+                    break
+            if participant_id_api is None:
+                continue
+
+            # --- Estadísticas contra oponente (matches) ---
+            for match in data.get('match', []):
+                op1 = match.get('opponent1')
+                op2 = match.get('opponent2')
+                if not op1 or not op2:
+                    continue
+                if op1.get('id') == participant_id_api:
+                    es_jugador1 = True
+                    oponente_id_api = op2.get('id')
+                elif op2.get('id') == participant_id_api:
+                    es_jugador1 = False
+                    oponente_id_api = op1.get('id')
+                else:
+                    continue
+
+                # Obtener nombre del oponente
+                oponente_nombre = None
+                for part in data.get('participant', []):
+                    if part['id'] == oponente_id_api:
+                        oponente_nombre = part['name']
+                        break
+                if not oponente_nombre:
+                    continue
+                oponente = Participante.query.filter_by(nickname=oponente_nombre).first()
+                if not oponente:
+                    continue
+
+                result = op1.get('result') if es_jugador1 else op2.get('result')
+                if result in ('win', 'loss'):
+                    key = oponente.id
+                    if key not in stats['torneos']['contra_oponente'][p.id]:
+                        stats['torneos']['contra_oponente'][p.id][key] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
+                    stats['torneos']['contra_oponente'][p.id][key]['jugados'] += 1
+                    if result == 'win':
+                        stats['torneos']['contra_oponente'][p.id][key]['ganados'] += 1
+
+            # --- Estadísticas por personaje: recolectar todos los juegos de este participante en el torneo ---
+            juegos_participante = []
+            for game in data.get('match_game', []):
+                op1 = game.get('opponent1')
+                op2 = game.get('opponent2')
+                if not op1 or not op2:
+                    continue
+                if op1.get('id') == participant_id_api:
+                    personaje_id = op1.get('personaje')
+                    result = op1.get('result')
+                    juegos_participante.append({'personaje': personaje_id, 'result': result})
+                elif op2.get('id') == participant_id_api:
+                    personaje_id = op2.get('personaje')
+                    result = op2.get('result')
+                    juegos_participante.append({'personaje': personaje_id, 'result': result})
+
+            # Determinar si usó el mismo personaje en todos los juegos del torneo
+            if juegos_participante:
+                # Filtrar juegos sin personaje (pueden existir si no se registró)
+                juegos_validos = [j for j in juegos_participante if j['personaje'] is not None]
+                if juegos_validos:
+                    primer_personaje = juegos_validos[0]['personaje']
+                    mismo_personaje = all(j['personaje'] == primer_personaje for j in juegos_validos)
+                    if mismo_personaje:
+                        # Torneo completo para ese personaje
+                        personaje_id = primer_personaje
+                        if personaje_id not in stats['torneos']['por_personaje'][p.id]:
+                            stats['torneos']['por_personaje'][p.id][personaje_id] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
+                        stats['torneos']['por_personaje'][p.id][personaje_id]['jugados'] += 1
+                        # Determinar si ganó el torneo (ranking==1) - ¿esto cuenta como victoria para el personaje?
+                        # Asumimos que si el participante ganó el torneo, ese torneo completo cuenta como una victoria para el personaje.
+                        if ranking == 1:
+                            stats['torneos']['por_personaje'][p.id][personaje_id]['ganados'] += 1
+
+                # Estadísticas parciales: cada juego cuenta
+                for juego in juegos_validos:
+                    personaje_id = juego['personaje']
+                    if personaje_id not in stats['torneos']['por_personaje_parcial'][p.id]:
+                        stats['torneos']['por_personaje_parcial'][p.id][personaje_id] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
+                    stats['torneos']['por_personaje_parcial'][p.id][personaje_id]['jugados'] += 1
+                    if juego['result'] == 'win':
+                        stats['torneos']['por_personaje_parcial'][p.id][personaje_id]['ganados'] += 1
+
+        # Calcular winrates
+        jugados = stats['torneos']['general'][p.id]['jugados']
+        if jugados > 0:
+            stats['torneos']['general'][p.id]['winrate'] = (stats['torneos']['general'][p.id]['ganados'] / jugados * 100)
+
+        for pers_id, data in stats['torneos']['por_personaje'][p.id].items():
+            if data['jugados'] > 0:
+                data['winrate'] = (data['ganados'] / data['jugados'] * 100)
+
+        for pers_id, data in stats['torneos']['por_personaje_parcial'][p.id].items():
+            if data['jugados'] > 0:
+                data['winrate'] = (data['ganados'] / data['jugados'] * 100)
+
+        for op_id, data in stats['torneos']['contra_oponente'][p.id].items():
+            if data['jugados'] > 0:
+                data['winrate'] = (data['ganados'] / data['jugados'] * 100)
 
     return stats
 
