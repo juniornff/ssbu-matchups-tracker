@@ -850,45 +850,22 @@ def gestion_torneos(evento_id):
         app.logger.info(f"Datos a enviar a la API: {datos_torneo}")
 
         # Enviar a la API externa
-        try:
-            response = requests.post(f"{API_TORNEOS_URL}/tournaments", json=datos_torneo)
-            response.raise_for_status()
-            resp_json = response.json()
-            # Extraer stageId
-            stage_id = resp_json.get('stageId')
-            app.logger.info(f"Stage id: {stage_id}")
-            if stage_id < 0 or stage_id is None:
+        respuesta = utils.api_request('POST', f"{API_TORNEOS_URL}/tournaments", json=datos_torneo)
+        if 'error' in respuesta:
+            flash(respuesta['error'], 'danger')
+        else:
+            stage_id = respuesta.get('stageId')
+            if stage_id is None or stage_id < 0:
                 flash('La respuesta de la API no contiene stageId', 'danger')
-                return redirect(url_for('gestion_torneos', evento_id=evento_id))
-
-            # Guardar en la base de datos
-            nuevo_torneo = Torneo(
-                evento_id=evento_id,
-                torneo_id_externo=stage_id,
-                nombre=datos_torneo.get('name', 'Torneo sin nombre')  # ejemplo, asumiendo que viene en data
-            )
-            db.session.add(nuevo_torneo)
-            db.session.commit()
-            flash('Torneo creado exitosamente', 'success')
-        except requests.exceptions.HTTPError as e:
-            # Error HTTP con posible mensaje de error en JSON
-            # error_msg = f"Error HTTP {e.response.status_code}"
-            try:
-                error_data = e.response.json()
-                if 'error' in error_data:
-                    error_msg = f"{error_data['error']}"
-            except:
-                pass
-            flash(error_msg, 'danger')
-        except requests.exceptions.ConnectionError:
-            flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
-        except requests.exceptions.Timeout:
-            flash('Tiempo de espera agotado al conectar con la API.', 'danger')
-        except requests.exceptions.RequestException as e:
-            flash(f'Error al comunicarse con la API: {str(e)}', 'danger')
-        except Exception as e:
-            flash(f'Error inesperado: {str(e)}', 'danger')
-            db.session.rollback()
+            else:
+                nuevo_torneo = Torneo(
+                    evento_id=evento_id,
+                    torneo_id_externo=stage_id,
+                    nombre=datos_torneo.get('name', 'Torneo sin nombre')
+                )
+                db.session.add(nuevo_torneo)
+                db.session.commit()
+                flash('Torneo creado exitosamente', 'success')
 
         return redirect(url_for('gestion_torneos', evento_id=evento_id))
 
@@ -919,35 +896,19 @@ def eliminar_torneo(torneo_id):
         flash('El evento está bloqueado, no se puede eliminar el torneo', 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
-    try:
-        response = requests.delete(f"{API_TORNEOS_URL}/stages/{stage_id}")
-        if response.status_code not in (200, 204):
-            # Intentar obtener mensaje de error
-            # error_msg = f"Error HTTP {response.status_code}"
-            try:
-                error_data = response.json()
-                if 'error' in error_data:
-                    error_msg = f"{error_data['error']}"
-            except:
-                pass
-            flash(error_msg, 'danger')
-            return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-
-        # Eliminar resultados del torneo en BD
-        TorneoResultado.query.filter_by(torneo_id=torneo.id).delete()
-        # Eliminar torneo
-        db.session.delete(torneo)
-        db.session.commit()
-        flash('Torneo eliminado con éxito', 'success')
-    except requests.exceptions.ConnectionError:
-        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
-    except requests.exceptions.Timeout:
-        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
-    except requests.exceptions.RequestException as e:
-        flash(f'Error de conexión con la API: {str(e)}', 'danger')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al eliminar torneo: {str(e)}', 'danger')
+    respuesta = utils.api_request('DELETE', f"{API_TORNEOS_URL}/stages/{stage_id}")
+    if 'error' in respuesta:
+        flash(respuesta['error'], 'danger')
+    else:
+        try:
+            # eliminar resultados y torneo en BD
+            TorneoResultado.query.filter_by(torneo_id=torneo.id).delete()
+            db.session.delete(torneo)
+            db.session.commit()
+            flash('Torneo eliminado con éxito', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al eliminar torneo: {str(e)}', 'danger')
 
     return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
@@ -993,25 +954,12 @@ def gestion_brackets(torneo_id):
                     'personaje': char2
                 }
             }
-            try:
-                response = requests.patch(f"{API_TORNEOS_URL}/matches/{match_id}", json=payload)
-                response.raise_for_status()
+            
+            respuesta = utils.api_request('PATCH', f"{API_TORNEOS_URL}/matches/{match_id}", json=payload)
+            if 'error' in respuesta:
+                flash(respuesta['error'], 'danger')
+            else:
                 flash('Match actualizado correctamente', 'success')
-            except requests.exceptions.HTTPError as e:
-                # error_msg = f"Error HTTP {e.response.status_code}"
-                try:
-                    error_data = e.response.json()
-                    if 'error' in error_data:
-                        error_msg = f"{error_data['error']}"
-                except:
-                    pass
-                flash(error_msg, 'danger')
-            except requests.exceptions.ConnectionError:
-                flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
-            except requests.exceptions.Timeout:
-                flash('Tiempo de espera agotado al conectar con la API.', 'danger')
-            except requests.exceptions.RequestException as e:
-                flash(f'Error al comunicarse con la API: {str(e)}', 'danger')
 
         elif tipo == 'con_hijos':
             game_indices = []
@@ -1063,32 +1011,13 @@ def gestion_brackets(torneo_id):
                             'personaje': char2
                         }
                     }
-                    try:
-                        resp = requests.patch(f"{API_TORNEOS_URL}/match-games/{game_id}", json=payload)
-                        resp.raise_for_status()
-                    except requests.exceptions.HTTPError as e:
+                    
+                    respuesta = utils.api_request('PATCH', f"{API_TORNEOS_URL}/match-games/{game_id}", json=payload)
+                    if 'error' in respuesta:
+                        flash(respuesta['error'], 'danger')
                         any_error = True
-                        # error_msg = f"Error al actualizar juego {game_id}: HTTP {e.response.status_code}"
-                        try:
-                            error_data = e.response.json()
-                            if 'error' in error_data:
-                                error_msg = f"{error_data['error']}"
-                        except:
-                            pass
-                        flash(error_msg, 'danger')
                         break
-                    except requests.exceptions.ConnectionError:
-                        any_error = True
-                        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
-                        break
-                    except requests.exceptions.Timeout:
-                        any_error = True
-                        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
-                        break
-                    except requests.exceptions.RequestException as e:
-                        any_error = True
-                        flash(f'Error al actualizar juego {game_id}: {str(e)}', 'danger')
-                        break
+
             if not any_error:
                 flash('Juegos actualizados correctamente', 'success')
         else:
@@ -1096,37 +1025,16 @@ def gestion_brackets(torneo_id):
 
         return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
-    try:
-        response = requests.get(f"{API_TORNEOS_URL}/stages/{stage_id}")
-        response.raise_for_status()
-        data = response.json()
+    data = utils.api_request('GET', f"{API_TORNEOS_URL}/stages/{stage_id}")
+    if 'error' in data:
+        flash(data['error'], 'danger')
+        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
-        response_matches = requests.get(f"{API_TORNEOS_URL}/stage/{stage_id}/current-matches")
-        response_matches.raise_for_status()
-        current_matches_data = response_matches.json()
-        current_matches = current_matches_data.get('currentMatches', [])
-    except requests.exceptions.HTTPError as e:
-        # error_msg = f"Error HTTP {e.response.status_code}"
-        try:
-            error_data = e.response.json()
-            if 'error' in error_data:
-                error_msg = f"{error_data['error']}"
-        except:
-            pass
-        flash(error_msg, 'danger')
+    current_matches_data = utils.api_request('GET', f"{API_TORNEOS_URL}/stage/{stage_id}/current-matches")
+    if 'error' in current_matches_data:
+        flash(current_matches_data['error'], 'danger')
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-    except requests.exceptions.ConnectionError:
-        flash('Error de conexión con la API. Verifique que el servidor esté corriendo.', 'danger')
-        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-    except requests.exceptions.Timeout:
-        flash('Tiempo de espera agotado al conectar con la API.', 'danger')
-        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-    except requests.exceptions.RequestException as e:
-        flash(f'Error al obtener datos del torneo: {str(e)}', 'danger')
-        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
-    except Exception as e:
-        flash(f'Error inesperado: {str(e)}', 'danger')
-        return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
+    current_matches = current_matches_data.get('currentMatches', [])
 
     personajes = Personaje.query.order_by(Personaje.nombre).all()
     todos_personajes = [{'id': p.id, 'nombre': p.nombre} for p in personajes]
@@ -1262,9 +1170,95 @@ def historial_participante(id):
             'videos': match.videos
         })
 
+    # Obtener torneos en los que participó
+    resultados_torneo = TorneoResultado.query.filter_by(participante_id=id).all()
+    torneos_data = []
+    for res in resultados_torneo:
+        torneo = res.torneo
+        stage_data = utils.api_request('GET', f"{API_TORNEOS_URL}/stages/{torneo.torneo_id_externo}")
+        if 'error' in stage_data:
+            continue
+        # Buscar el id del participante en la API
+        participant_id_api = None
+        for part in stage_data.get('participant', []):
+            if part['name'] == participante.nickname:
+                participant_id_api = part['id']
+                break
+        if participant_id_api is None:
+            continue
+        # Recolectar personajes usados en el torneo
+        personajes_ids = set()
+        # Matches sin hijos
+        for match in stage_data.get('match', []):
+            if match.get('child_count') == 0:
+                if match.get('opponent1', {}).get('id') == participant_id_api:
+                    pid = match.get('opponent1', {}).get('personaje')
+                    if pid:
+                        personajes_ids.add(pid)
+                if match.get('opponent2', {}).get('id') == participant_id_api:
+                    pid = match.get('opponent2', {}).get('personaje')
+                    if pid:
+                        personajes_ids.add(pid)
+        # Match games (para matches con hijos)
+        for game in stage_data.get('match_game', []):
+            if game.get('opponent1', {}).get('id') == participant_id_api:
+                pid = game.get('opponent1', {}).get('personaje')
+                if pid:
+                    personajes_ids.add(pid)
+            if game.get('opponent2', {}).get('id') == participant_id_api:
+                pid = game.get('opponent2', {}).get('personaje')
+                if pid:
+                    personajes_ids.add(pid)
+        personajes_objs = Personaje.query.filter(Personaje.id.in_(personajes_ids)).all()
+        resultado = "Ganador" if res.ranking == 1 else "Perdedor"
+        torneos_data.append({
+            'torneo': torneo,
+            'ranking': res.ranking,
+            'resultado': resultado,
+            'personajes': personajes_objs,
+            'evento': torneo.evento,
+        })
+    
+    # Agrupar por evento
+    eventos_dict = {}
+    # Matches de rondas
+    for match in datos_matches:
+        evento = match['evento']
+    # Rehacer: primero construir eventos_dict con los matches originales.
+    eventos_dict = {}
+    for match in todos_matches:
+        evento = match.ronda.evento
+        if evento.id not in eventos_dict:
+            eventos_dict[evento.id] = {
+                'evento': evento,
+                'rondas': [],
+                'torneos': []
+            }
+        # Añadir el match ya procesado (con los datos listos para mostrar)
+        # Buscamos el match procesado en datos_matches (por id)
+        match_data = next((m for m in datos_matches if m['fecha'] == match.fecha and m['oponente'].id == (match.jugador2_id if match.jugador1_id == id else match.jugador1_id)), None)
+        if match_data:
+            eventos_dict[evento.id]['rondas'].append(match_data)
+        else:
+            # Si no se encuentra (no debería), añadir un placeholder
+            eventos_dict[evento.id]['rondas'].append(match)
+
+    # Torneos
+    for tdata in torneos_data:
+        evento = tdata['evento']
+        if evento.id not in eventos_dict:
+            eventos_dict[evento.id] = {
+                'evento': evento,
+                'rondas': [],
+                'torneos': []
+            }
+        eventos_dict[evento.id]['torneos'].append(tdata)
+
+    eventos_list = sorted(eventos_dict.values(), key=lambda x: x['evento'].fecha, reverse=True)
+
     return render_template('historial.html',
                           participante=participante,
-                          matches=datos_matches)
+                          eventos=eventos_list)
 
 if __name__ == '__main__':
     app.run(debug=True)

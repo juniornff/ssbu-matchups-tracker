@@ -94,6 +94,28 @@ def actualizar_personajes_participantes_logic(app):
 
     db.session.commit()
 
+def api_request(method, url, **kwargs):
+    """
+    Realiza una petición HTTP a la API externa y maneja errores comunes.
+    Retorna el JSON de la respuesta si es exitosa, o un dict con 'error' en caso contrario.
+    """
+    try:
+        response = requests.request(method, url, timeout=5, **kwargs)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_data = e.response.json()
+            return {'error': error_data.get('error', f'HTTP {e.response.status_code}')}
+        except:
+            return {'error': f'HTTP {e.response.status_code}'}
+    except requests.exceptions.ConnectionError:
+        return {'error': 'Error de conexión con la API'}
+    except requests.exceptions.Timeout:
+        return {'error': 'Tiempo de espera agotado'}
+    except requests.exceptions.RequestException as e:
+        return {'error': f'Error: {str(e)}'}
+
 def obtener_standings_torneo(torneo, api_url):
     """
     Obtiene los standings de un torneo desde la API.
@@ -101,35 +123,26 @@ def obtener_standings_torneo(torneo, api_url):
     Además, guarda los resultados en la base de datos si no existen.
     """
     stage_id = torneo.torneo_id_externo
-    try:
-        response = requests.get(f"{api_url}/tournaments/{stage_id}/standings")
-        if response.status_code == 200:
-            standings_data = response.json()
-            # Guardar en BD si no existen resultados
-            resultados_existentes = TorneoResultado.query.filter_by(torneo_id=torneo.id).count()
-            if resultados_existentes == 0 and 'standings' in standings_data:
-                for item in standings_data['standings']:
-                    participante = Participante.query.filter_by(nickname=item['name']).first()
-                    if participante:
-                        resultado = TorneoResultado(
-                            torneo_id=torneo.id,
-                            participante_id=participante.id,
-                            ranking=item['rank']
-                        )
-                        db.session.add(resultado)
-                db.session.commit()
-            return standings_data
-        else:
-            if response.status_code == 404:
-                return {'error': 'No disponible (torneo no encontrado)'}
-            if response.status_code == 500:
-                return {'error': 'No disponible (Completar todos los partidos del torneo)'}
-    except requests.exceptions.ConnectionError:
-        return {'error': 'Error de conexión con la API'}
-    except requests.exceptions.Timeout:
-        return {'error': 'Tiempo de espera agotado'}
-    except requests.exceptions.RequestException as e:
-        return {'error': f'Error: {str(e)}'}
+    resultado = api_request('GET', f"{api_url}/tournaments/{stage_id}/standings")
+    if 'error' in resultado:
+        return resultado
+
+    # resultado es el JSON de standings
+    standings_data = resultado
+    # Guardar en BD si no existen resultados
+    resultados_existentes = TorneoResultado.query.filter_by(torneo_id=torneo.id).count()
+    if resultados_existentes == 0 and 'standings' in standings_data:
+        for item in standings_data['standings']:
+            participante = Participante.query.filter_by(nickname=item['name']).first()
+            if participante:
+                nuevo_resultado = TorneoResultado(
+                    torneo_id=torneo.id,
+                    participante_id=participante.id,
+                    ranking=item['rank']
+                )
+                db.session.add(nuevo_resultado)
+        db.session.commit()
+    return standings_data
 
 def generar_round_robin(participantes_ids):
     """Genera todos los enfrentamientos posibles entre participantes"""
@@ -172,14 +185,11 @@ def calcular_winrates(participantes, personajes):
 
     for torneo in torneos_con_resultados:
         stage_id = torneo.torneo_id_externo
-        try:
-            response = requests.get(f"{api_url}/stages/{stage_id}", timeout=5)
-            if response.status_code == 200:
-                torneos_data_cache[torneo.id] = response.json()
-            else:
-                torneos_data_cache[torneo.id] = None
-        except requests.exceptions.RequestException:
+        resultado = api_request('GET', f"{api_url}/stages/{stage_id}")
+        if 'error' in resultado:
             torneos_data_cache[torneo.id] = None
+        else:
+            torneos_data_cache[torneo.id] = resultado
 
     for p in participantes:
         # Estadísticas de partidos
