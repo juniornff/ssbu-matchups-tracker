@@ -5,10 +5,11 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 ## Features
 
 - Participant management (registration, deactivation, reactivation).
-- Complete SSBU character catalog. (images used come from https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/)
+- Complete SSBU character catalog. (images used come from [spriters-resource](https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/)
 - Event creation and attendance registration.
 - Automatic round generation with Round Robin system.
 - Match results recording (matchups) per round (best of 5).
+- Tournament Brackets Engine by Integrating the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library through a custom-built REST API (later i will publish the repo)
 - Detailed statistics: win rates by player, by character, and against opponents.
 - Individual history for each participant.
 - Current round configuration for quick access to ongoing matches.
@@ -22,14 +23,12 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - **Database**: SQLite (with SQLAlchemy)
 - **Frontend**: Bootstrap 5, Tom Select (for enhanced selects)
 - **Task scheduling**: APScheduler
+- **APIs Used**: Custom-built REST API for the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library
 - **CI/CD**: GitHub Actions, Docker, GitHub Container Registry (ghcr.io)
 
 ## Future Plans
 
 - **Database Migration:** Transition from SQLite to **MySQL** for improved scalability, concurrent access, and performance as the community grows.
-
-- **Tournament Bracket Engine:** Integrate the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library through a custom-built **REST API** to automate bracket generation, management, and real-time updates for single/double‑elimination tournaments.
-
 - **User Authentication & Profiles:** Implement a secure user login system (e.g., OAuth or email/password) to enable personalized experiences, role‑based access control, and the ability for players to manage their registrations and match histories.
 
 ## Prerequisites

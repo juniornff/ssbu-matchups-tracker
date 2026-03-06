@@ -6,7 +6,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import atexit
 from datetime import datetime
-import requests
 import json
 
 # Crear la aplicación Flask
