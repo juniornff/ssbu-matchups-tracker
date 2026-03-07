@@ -8,3 +8,5 @@ services:
     volumes:
       - ./instance:/app/instance
       - ./pass.txt:/app/pass.txt
+    environment:
+      - API_TORNEOS_URL=http://tournament-server:3000

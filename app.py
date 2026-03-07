@@ -35,7 +35,7 @@ ronda_actual_id = None
 # Variable ajustable para el intervalo (en horas)
 INTERVALO_ACTUALIZACION_HORAS = 24
 # Variable para el URL del API de Torneos
-API_TORNEOS_URL = "http://localhost:3000"
+API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL', 'http://localhost:3000')
 
 with app.app_context():
     if utils.check_api_connection(API_TORNEOS_URL):
