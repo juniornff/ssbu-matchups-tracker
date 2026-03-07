@@ -46,20 +46,26 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     cd ssbu-matchups-tracker
     ```
 
-2. **Create and activate a virtual environment (recommended)**
+2. **Clone the API repository**
+
+    ```bash
+    git clone https://github.com/juniornff/brackets-manager-server.git
+    ```
+
+3. **Create and activate a virtual environment (recommended)**
 
     ```bash
     python -m venv venv
     source venv/bin/activate  # Linux/Mac
     venv\Scripts\activate     # Windows
     ```
-3. **Install dependencies**
+4. **Install dependencies**
 
     ```bash
     pip install -r requirements.txt
     ```
 
-4. **Configure the secret code**
+5. **Configure the secret code**
 
     Create a "pass.txt" file in the project root with a single line containing the password that will protect sensitive actions (e.g., deleting participants, events, etc.).
 
@@ -67,7 +73,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     echo "your_secret_password" > pass.txt
     ```
 
-5. **Initialize the database**
+6. **Initialize the database**
 
     The application will automatically create the SQLite database at "instance/smash.db" and populate the characters on first start.
 
