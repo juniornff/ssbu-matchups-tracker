@@ -37,6 +37,12 @@ INTERVALO_ACTUALIZACION_HORAS = 24
 # Variable para el URL del API de Torneos
 API_TORNEOS_URL = "http://localhost:3000"
 
+with app.app_context():
+    if utils.check_api_connection(API_TORNEOS_URL):
+        app.logger.info("Conexión con API de torneos establecida correctamente.")
+    else:
+        app.logger.warning("No se pudo conectar con la API de torneos. Algunas funciones pueden no estar disponibles.")
+
 # Función para la tarea programada
 def actualizar_personajes_automatico():
     with app.app_context():

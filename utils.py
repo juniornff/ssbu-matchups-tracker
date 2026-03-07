@@ -116,6 +116,16 @@ def api_request(method, url, **kwargs):
     except requests.exceptions.RequestException as e:
         return {'error': f'Error: {str(e)}'}
 
+def check_api_connection(api_url):
+    """
+    Verifica la conexión con la API externa usando el endpoint /health.
+    Retorna True si la conexión es exitosa, False en caso contrario.
+    """
+    resultado = api_request('GET', f"{api_url}/health")
+    if 'error' in resultado:
+        return False
+    return resultado.get('status') == 'OK'
+
 def obtener_standings_torneo(torneo, api_url):
     """
     Obtiene los standings de un torneo desde la API.
