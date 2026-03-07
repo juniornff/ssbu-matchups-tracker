@@ -38,6 +38,7 @@ INTERVALO_ACTUALIZACION_HORAS = 24
 API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL', 'http://localhost:3000')
 
 with app.app_context():
+    app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
     if utils.check_api_connection(API_TORNEOS_URL):
         app.logger.info("Conexión con API de torneos establecida correctamente.")
     else:
