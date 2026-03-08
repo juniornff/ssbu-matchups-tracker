@@ -1,6 +1,6 @@
 # Smash Matchups Tracker
 
-Web application to organize and manage **Super Smash Bros Ultimate** meetups and tournaments for local/small communities. It allows registering participants, characters, events, rounds, matches, and displaying their statistics.
+Web application to organize and manage **Super Smash Bros Ultimate** meetups and tournaments for local/small communities. It allows registering participants, characters, events, rounds, matches, tournaments and displaying their statistics.
 
 ## Features
 
@@ -38,7 +38,124 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - Node.js (for the API server)
 - (Optional) Docker
 
+## Usage with Docker
+
+2. **Prepare the project directory**
+
+    Create a folder for the project and navigate into it:
+
+    ```bash
+    mkdir ssbu-matchups && cd ssbu-matchups
+    ```
+
+3. **Create the `docker-compose.yml` file**
+
+    Copy the following content into a file named `docker-compose.yml` or [download it](docker-compose.yml):
+
+    ```yaml
+    services:
+    tournament-server:
+        image: ghcr.io/juniornff/brackets-manager-server:latest
+        container_name: brackets-manager-api
+        restart: unless-stopped
+        ports:
+        - "3000:3000"
+        volumes:
+        - ./data:/app/data
+        environment:
+        - DATA_FILE=data/db.json
+        networks:
+        - smash-net
+
+    ssbu_matchups:
+        image: ghcr.io/juniornff/ssbu-matchups-tracker:latest
+        container_name: Ssbu_Matchups
+        restart: unless-stopped
+        ports:
+        - "5000:5000"
+        volumes:
+        - ./instance:/app/instance
+        - ./pass.txt:/app/pass.txt
+        environment:
+        - API_TORNEOS_URL=http://tournament-server:3000
+        depends_on:
+        - tournament-server
+        networks:
+        - smash-net
+
+    networks:
+    smash-net:
+        driver: bridge
+    ```
+
+4. **Create the secret password file**
+
+    The Flask app requires a file named `pass.txt` in the same directory, containing a single line with a secret password that will protect sensitive actions (e.g., deleting participants, events, etc.). Create it with:
+
+    ```bash
+    echo "your_secure_password" > pass.txt
+    ```
+
+    Replace `your_secure_password` with a strong password of your choice.
+
+5. **Start the containers**
+
+    Run the following command to pull the images and start the services in the background:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    Docker Compose will automatically create the required networks and volumes. The `tournament-server` API will be available at `http://localhost:3000` and the main application at `http://localhost:5000`.
+
+6. **Verify the services are running**
+
+    Check the container status:
+
+    ```bash
+    docker compose ps
+    ```
+
+    You should see both containers with `Up` status. To view the logs:
+
+    ```bash
+    docker compose logs -f
+    ```
+
+    Press `Ctrl+C` to exit the log view.
+
+7. **Access the application**
+
+    Open your browser and go to `http://localhost:5000`. You should see the Smash Matchups Tracker homepage.
+
+8. **Stopping and removing the containers**
+
+    To stop the services without deleting data:
+
+    ```bash
+    docker compose stop
+    ```
+
+    To stop and remove containers, networks, and any created volumes (your data in `./data` and `./instance` will persist because they are bind mounts):
+
+    ```bash
+    docker compose down
+    ```
+
+9. **Updating to the latest version**
+
+    The images are automatically rebuilt and published on GitHub Container Registry whenever changes are pushed to the `main` branch. To update your local containers to the latest version:
+
+    ```bash
+    docker compose pull
+    docker compose up -d
+    ```
+
+    This will pull fresh images and recreate the containers.
+
 ## Local installation and execution
+
+If you prefer to run the application directly on your system without Docker, follow these steps.
 
 1. **Clone the repository**
 
@@ -88,14 +205,6 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     ```
 
     The app will be available at http://localhost:5000.
-
-## Usage with Docker
-
-If you prefer to use Docker for execution:
-
-```bash
-docker compose up -d
-```
 
 ## License
 
