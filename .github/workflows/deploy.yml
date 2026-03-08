@@ -43,29 +43,46 @@ jobs:
             set -e
             cd ~/Applications/ssbu_matchups
 
-            # Si no existe docker-compose.yml, usar el de producción
+            # URL base del repositorio raw
+            REPO_URL="https://raw.githubusercontent.com/juniornff/ssbu-matchups-tracker/main"
+
+            # 1. Verificar si docker-compose.yml existe localmente
             if [ ! -f docker-compose.yml ]; then
-              cp docker-compose.prod.yml docker-compose.yml
+              echo "docker-compose.yml no encontrado, descargando..."
+              wget -q -O docker-compose.yml "$REPO_URL/docker-compose.yml" || { echo "Error al descargar docker-compose.yml"; exit 1; }
+            else
+              echo "docker-compose.yml existe localmente."
             fi
 
-            # Descargar la última imagen
-            docker pull ghcr.io/juniornff/ssbu-matchups-tracker:latest
-
-            # Detener contenedor anterior (si existe)
+            # 2. Detener el contenedor actual (con el archivo actual)
             docker compose down || true
 
-            # Levantar nuevo contenedor
+            # 3. Actualizar docker-compose.yml con la nueva versión del repositorio
+            echo "Actualizando docker-compose.yml desde el repositorio..."
+            wget -q -O docker-compose.yml "$REPO_URL/docker-compose.yml" || { echo "Error al descargar docker-compose.yml"; exit 1; }
+
+            # 4. Descargar la última version de las imagenes
+            docker pull ghcr.io/juniornff/ssbu-matchups-tracker:latest
+            docker pull ghcr.io/juniornff/brackets-manager-server:latest
+
+            # 5. Levantar los nuevos contenedores
             docker compose up -d
 
-            # Esperar unos segundos y verificar que el contenedor está corriendo
+            # 6. Verificar que los contenedores estén corriendo
             sleep 5
             if [ -z "$(docker compose ps -q)" ]; then
               echo "Error: el contenedor no se inició correctamente"
               exit 1
             fi
 
-            # Eliminar la imagen anterior si existe y es diferente
-            OLD_IMAGE=$(docker images --filter=reference='ghcr.io/juniornff/ssbu-matchups-tracker:latest' --format '{{.ID}}' | tail -n +2 | head -1)
-            if [ -n "$OLD_IMAGE" ]; then
-              docker rmi "$OLD_IMAGE" || true
+            # 7. Eliminar las imágenes anteriores
+            # App
+            OLD_APP_IMAGE=$(docker images --filter=reference='ghcr.io/juniornff/ssbu-matchups-tracker:latest' --format '{{.ID}}' | tail -n +2 | head -1)
+            if [ -n "$OLD_APP_IMAGE" ]; then
+              docker rmi "$OLD_APP_IMAGE" || true
+            fi
+            # Tournament server
+            OLD_TOURNAMENT_IMAGE=$(docker images --filter=reference='ghcr.io/juniornff/brackets-manager-server:latest' --format '{{.ID}}' | tail -n +2 | head -1)
+            if [ -n "$OLD_TOURNAMENT_IMAGE" ]; then
+              docker rmi "$OLD_TOURNAMENT_IMAGE" || true
             fi

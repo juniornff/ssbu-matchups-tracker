@@ -1,10 +1,31 @@
 services:
+  tournament-server:
+    image: ghcr.io/juniornff/brackets-manager-server:latest
+    container_name: brackets-manager-api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATA_FILE=data/db.json
+    restart: unless-stopped
+
   ssbu_matchups:
-    build: .
+    image: ghcr.io/juniornff/ssbu-matchups-tracker:latest
     container_name: Ssbu_Matchups
-    restart: 'unless-stopped'
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
       - ./instance:/app/instance
       - ./pass.txt:/app/pass.txt
+    environment:
+      - API_TORNEOS_URL=http://tournament-server:3000
+    depends_on:
+      - tournament-server
+    networks:
+      - smash-net
+
+networks:
+  smash-net:
+    driver: bridge

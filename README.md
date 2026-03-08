@@ -35,6 +35,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 - Python 3.9 or higher
 - pip (Python package manager)
+- Node.js (for the API server)
 - (Optional) Docker
 
 ## Local installation and execution
@@ -46,10 +47,13 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     cd ssbu-matchups-tracker
     ```
 
-2. **Clone the API repository**
+2. **Clone and start the API repository**
 
     ```bash
     git clone https://github.com/juniornff/brackets-manager-server.git
+    cd brackets-manager-server
+    npm install
+    npm start
     ```
 
 3. **Create and activate a virtual environment (recommended)**
