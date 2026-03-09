@@ -166,7 +166,7 @@ def generar_round_robin(participantes_ids):
             })
     return matches
 
-def calcular_winrates(participantes, personajes):
+def calcular_winrates(participantes, personajes, api_url):
     stats = {
         'partidos': {
             'general': {},
@@ -186,8 +186,6 @@ def calcular_winrates(participantes, personajes):
             'contra_oponente': defaultdict(lambda: defaultdict(dict))
         }
     }
-
-    api_url = current_app.config.get('API_TORNEOS_URL', 'http://localhost:3000')
 
     # Obtener todos los torneos que tienen resultados (para limitar peticiones)
     torneos_con_resultados = db.session.query(Torneo).join(TorneoResultado).distinct().all()

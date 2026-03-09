@@ -459,7 +459,7 @@ def eliminar_evento(id):
     # Comprobar si el evento esta activo
     if not evento.activo:
         flash('Evento bloqueado, No se puede eliminar', 'danger')
-        return redirect(url_for('gestion_eventos', evento_id=id))
+        return redirect(url_for('gestion_eventos'))
 
     try:
         # Eliminar rondas asociadas y sus matches
@@ -468,6 +468,19 @@ def eliminar_evento(id):
             Match.query.filter_by(ronda_id=ronda.id).delete()
             # Eliminar la ronda
             db.session.delete(ronda)
+        
+        # Eliminar torneos asociados al evento
+        for torneo in evento.torneos:
+            # Eliminar resultados del torneo en BD
+            TorneoResultado.query.filter_by(torneo_id=torneo.id).delete()
+            # Eliminar el torneo en la API
+            resp = utils.api_request('DELETE', f"{API_TORNEOS_URL}/stages/{torneo.torneo_id_externo}")
+            if 'error' in resp:
+                flash(f"Error al eliminar torneo '{torneo.nombre}' en la API: {resp['error']}", 'danger')
+                db.session.rollback()
+                return redirect(url_for('gestion_eventos'))
+            # Eliminar el torneo de la BD
+            db.session.delete(torneo)
 
         # Eliminar asistencias del evento
         Asistencia.query.filter_by(evento_id=id).delete()
@@ -945,7 +958,7 @@ def gestion_brackets(torneo_id):
             elif score2 > score1:
                 result1, result2 = 'loss', 'win'
             else:
-                flash('Los scores no pueden ser iguales en un match sin hijos', 'warning')
+                flash('No pueden haber empates', 'warning')
                 return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
             payload = {
@@ -1002,8 +1015,8 @@ def gestion_brackets(torneo_id):
                         result1, result2 = 'loss', 'win'
                         victorias_op2 += 1
                     else:
-                        # Empate: no se procesa
-                        continue
+                        flash(f'No pueden haber empates, ajustar resultados de la partida #{idx}', 'warning')
+                        return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
                     payload = {
                         'opponent1': {
@@ -1074,7 +1087,7 @@ def mostrar_estadisticas():
                               personajes=personajes,
                               mensaje="No hay datos estadísticos disponibles")
 
-    stats = utils.calcular_winrates(participantes, personajes)
+    stats = utils.calcular_winrates(participantes, personajes, API_TORNEOS_URL)
     return render_template('estadisticas.html',
                           stats=stats,
                           participantes=participantes,
