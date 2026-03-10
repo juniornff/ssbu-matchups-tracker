@@ -11,7 +11,7 @@ import json
 # Crear la aplicación Flask
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'smash.db')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', utils.generar_Codigo_Secreto())
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or utils.generar_Codigo_Secreto()
 app.logger.info(f"SECRET_KEY: {app.config['SECRET_KEY']}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -30,14 +30,14 @@ scheduler.start()
 
 # Variables
 # Codigo secreto para acciones sensibles
-Codigo_Secreto = os.environ.get('SECRET_CODE', utils.generar_Codigo_Secreto())
+Codigo_Secreto = os.environ.get('SECRET_CODE') or utils.generar_Codigo_Secreto()
 app.logger.info(f"SECRET_CODE: {Codigo_Secreto}")
 # Variable que indica que Ronda usar para el boton en Index
 ronda_actual_id = None
 # Variable ajustable para el intervalo (en horas)
 INTERVALO_ACTUALIZACION_HORAS = 24
 # Variable para el URL del API de Torneos
-API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL', 'http://localhost:3000')
+API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://localhost:3000'
 
 with app.app_context():
     app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
