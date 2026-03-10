@@ -20,9 +20,10 @@ services:
       - "5000:5000"
     volumes:
       - ./instance:/app/instance
-      - ./pass.txt:/app/pass.txt
     environment:
       - API_TORNEOS_URL=http://tournament-server:3000
+      - SECRET_KEY=${SECRET_KEY}
+      - SECRET_CODE=${SECRET_CODE}
     depends_on:
       - tournament-server
     networks:

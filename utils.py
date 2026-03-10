@@ -1,6 +1,6 @@
 from collections import defaultdict, deque
 from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match
-import random
+import random, string
 import requests
 import json
 from flask import current_app
@@ -39,20 +39,14 @@ def seed_personajes():
     db.session.commit()
     return count
 
-def obtener_Codigo_Secreto():
-    try:
-        with open('pass.txt', 'r') as f:
-            Codigo_Secreto = f.read().strip()
-        if not Codigo_Secreto:
-            raise ValueError("El archivo pass.txt está vacío")
-    except FileNotFoundError:
-        app.logger.info("ERROR: No se encontró el archivo pass.txt")
-        app.logger.info("Por favor crea un archivo pass.txt con el código secreto")
-        exit(1)
-    except Exception as e:
-        app.logger.info(f"ERROR leyendo pass.txt: {str(e)}")
-        exit(1)
-    return Codigo_Secreto
+def generar_Codigo_Secreto():
+    """
+    Genera una contraseña aleatoria de entre 6 y 12 caracteres.
+    Retorna el string generado.
+    """
+    length = random.randint(6, 12)
+    chars = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(random.choices(chars, k=length))
 
 # Función común para actualizar personajes
 def actualizar_personajes_participantes_logic(app):

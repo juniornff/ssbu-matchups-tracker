@@ -11,7 +11,8 @@ import json
 # Crear la aplicación Flask
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'smash.db')
-app.config['SECRET_KEY'] = 'supersecreto'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', utils.generar_Codigo_Secreto())
+app.logger.info(f"SECRET_KEY: {app.config['SECRET_KEY']}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Asegurar que el directorio de instancias exista
@@ -27,9 +28,10 @@ utils.init_db(app)
 scheduler = BackgroundScheduler()
 scheduler.start()
 
-Codigo_Secreto = utils.obtener_Codigo_Secreto()
-
 # Variables
+# Codigo secreto para acciones sensibles
+Codigo_Secreto = os.environ.get('SECRET_CODE', utils.generar_Codigo_Secreto())
+app.logger.info(f"SECRET_CODE: {Codigo_Secreto}")
 # Variable que indica que Ronda usar para el boton en Index
 ronda_actual_id = None
 # Variable ajustable para el intervalo (en horas)

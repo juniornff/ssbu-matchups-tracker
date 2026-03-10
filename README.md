@@ -28,7 +28,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 ## Future Plans
 
-- **Database Migration:** Transition from SQLite to **MySQL** for improved scalability, concurrent access, and performance as the community grows.
+- **MySQL Database Integration:** Enable the option to use MySQL as a database alternative to SQLite.
 - **User Authentication & Profiles:** Implement a secure user login system (e.g., OAuth or email/password) to enable personalized experiences, role‑based access control, and the ability for players to manage their registrations and match histories.
 
 ## Prerequisites
@@ -40,7 +40,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 ## Usage with Docker
 
-2. **Prepare the project directory**
+1. **Prepare the project directory**
 
     Create a folder for the project and navigate into it:
 
@@ -48,7 +48,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     mkdir ssbu-matchups && cd ssbu-matchups
     ```
 
-3. **Create the `docker-compose.yml` file**
+2. **Create the `docker-compose.yml` file**
 
     Copy the following content into a file named `docker-compose.yml` or [download it](docker-compose.yml):
 
@@ -75,9 +75,10 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         - "5000:5000"
         volumes:
         - ./instance:/app/instance
-        - ./pass.txt:/app/pass.txt
         environment:
         - API_TORNEOS_URL=http://tournament-server:3000
+        - SECRET_KEY=${SECRET_KEY}
+        - SECRET_CODE=${SECRET_CODE}
         depends_on:
         - tournament-server
         networks:
@@ -88,17 +89,24 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         driver: bridge
     ```
 
-4. **Create the secret password file**
+3. **Configure environment variables (optional but recommended)**
 
-    The Flask app requires a file named `pass.txt` in the same directory, containing a single line with a secret password that will protect sensitive actions (e.g., deleting participants, events, etc.). Create it with:
+    The application uses two important secret values:
+    - `SECRET_KEY`: Used by Flask for session security and cryptographic signing.
+    - `SECRET_CODE`: A custom secret that protects sensitive actions (e.g., deleting events, participants, etc.).
+
+    You can define these variables in a `.env` file placed in the same directory as your `docker-compose.yml`.  
+    Create a file named `.env` with the following content (replace the values with your own strong secrets):
 
     ```bash
-    echo "your_secure_password" > pass.txt
+    SECRET_KEY=your_flask_secret_key_here
+    SECRET_CODE=your_custom_secret_code_here
     ```
 
-    Replace `your_secure_password` with a strong password of your choice.
+    If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.
+    For production, it is strongly recommended to set them explicitly to maintain session persistence and avoid unexpected changes.
 
-5. **Start the containers**
+4. **Start the containers**
 
     Run the following command to pull the images and start the services in the background:
 
@@ -108,7 +116,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
     Docker Compose will automatically create the required networks and volumes. The `tournament-server` API will be available at `http://localhost:3000` and the main application at `http://localhost:5000`.
 
-6. **Verify the services are running**
+5. **Verify the services are running**
 
     Check the container status:
 
@@ -124,11 +132,11 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
     Press `Ctrl+C` to exit the log view.
 
-7. **Access the application**
+6. **Access the application**
 
     Open your browser and go to `http://localhost:5000`. You should see the Smash Matchups Tracker homepage.
 
-8. **Stopping and removing the containers**
+7. **Stopping and removing the containers**
 
     To stop the services without deleting data:
 
@@ -142,7 +150,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     docker compose down
     ```
 
-9. **Updating to the latest version**
+8. **Updating to the latest version**
 
     The images are automatically rebuilt and published on GitHub Container Registry whenever changes are pushed to the `main` branch. To update your local containers to the latest version:
 
@@ -186,13 +194,36 @@ If you prefer to run the application directly on your system without Docker, fol
     pip install -r requirements.txt
     ```
 
-5. **Configure the secret code**
+5. **Configure environment variables**
 
-    Create a "pass.txt" file in the project root with a single line containing the password that will protect sensitive actions (e.g., deleting participants, events, etc.).
+    The application requires the following environment variables:
 
+    - `SECRET_KEY`: Used by Flask for session security and cryptographic signing.
+    - `SECRET_CODE`: A custom secret that protects sensitive actions (e.g., deleting events, participants, etc.).
+    - `API_TORNEOS_URL`: URL of the tournament manager API (default is `http://localhost:3000` if not set).
+
+    You can set these variables in your terminal before running the application, or use a `.env` file with a tool like `python-dotenv` (the application does not load `.env` automatically in development mode; you need to export them manually or use a package like `python-dotenv` in your own setup).
+
+    **On Linux / Mac:**
     ```bash
-    echo "your_secret_password" > pass.txt
+    export SECRET_KEY="your_flask_secret_key"
+    export SECRET_CODE="your_custom_secret_code"
+    export API_TORNEOS_URL="http://localhost:3000"  # adjust if your API runs elsewhere
     ```
+
+    **On Windows:**
+    ```bash
+    # Command Prompt
+    set SECRET_KEY=your_flask_secret_key
+    set SECRET_CODE=your_custom_secret_code
+    set API_TORNEOS_URL=http://localhost:3000
+    # PowerShell
+    $env:SECRET_KEY="your_flask_secret_key"
+    $env:SECRET_CODE="your_custom_secret_code"
+    $env:API_TORNEOS_URL="http://localhost:3000"
+    ```
+    If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.
+    For production, it is strongly recommended to set them explicitly to maintain session persistence and avoid unexpected changes.
 
 6. **Initialize the database**
 
