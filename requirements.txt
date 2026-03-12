@@ -2,3 +2,4 @@ Flask
 Flask-SQLAlchemy
 APScheduler
 requests
+python-dotenv
