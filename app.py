@@ -1197,13 +1197,13 @@ def historial_participante(id):
     for res in resultados_torneo:
         torneo = res.torneo
         stage_data = utils.api_request('GET', f"{API_TORNEOS_URL}/stages/{torneo.torneo_id_externo}")
-        if 'error' in stage_data:
+        if 'error' in stage_data or stage_data is None:
             continue
         # Buscar el id del participante en la API
         participant_id_api = None
         for part in stage_data.get('participant', []):
-            if part['name'] == participante.nickname:
-                participant_id_api = part['id']
+            if part and part.get('name') == participante.nickname:
+                participant_id_api = part.get('id')
                 break
         if participant_id_api is None:
             continue
@@ -1211,26 +1211,39 @@ def historial_participante(id):
         personajes_ids = set()
         # Matches sin hijos
         for match in stage_data.get('match', []):
+            if match is None:
+                continue
+            # Solo considerar matches sin hijos
             if match.get('child_count') == 0:
-                if match.get('opponent1', {}).get('id') == participant_id_api:
-                    pid = match.get('opponent1', {}).get('personaje')
+                # Verificar opponent1
+                opp1 = match.get('opponent1')
+                if opp1 and opp1.get('id') == participant_id_api:
+                    pid = opp1.get('personaje')
                     if pid:
                         personajes_ids.add(pid)
-                if match.get('opponent2', {}).get('id') == participant_id_api:
-                    pid = match.get('opponent2', {}).get('personaje')
+                # Verificar opponent2
+                opp2 = match.get('opponent2')
+                if opp2 and opp2.get('id') == participant_id_api:
+                    pid = opp2.get('personaje')
                     if pid:
                         personajes_ids.add(pid)
         # Match games (para matches con hijos)
         for game in stage_data.get('match_game', []):
-            if game.get('opponent1', {}).get('id') == participant_id_api:
-                pid = game.get('opponent1', {}).get('personaje')
+            if game is None:
+                continue
+            # Verificar opponent1
+            opp1 = game.get('opponent1')
+            if opp1 and opp1.get('id') == participant_id_api:
+                pid = opp1.get('personaje')
                 if pid:
                     personajes_ids.add(pid)
-            if game.get('opponent2', {}).get('id') == participant_id_api:
-                pid = game.get('opponent2', {}).get('personaje')
+            # Verificar opponent2
+            opp2 = game.get('opponent2')
+            if opp2 and opp2.get('id') == participant_id_api:
+                pid = opp2.get('personaje')
                 if pid:
                     personajes_ids.add(pid)
-        personajes_objs = Personaje.query.filter(Personaje.id.in_(personajes_ids)).all()
+        personajes_objs = Personaje.query.filter(Personaje.id.in_(personajes_ids)).all() if personajes_ids else []
         resultado = "Ganador" if res.ranking == 1 else "Perdedor"
         torneos_data.append({
             'torneo': torneo,
