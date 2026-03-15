@@ -181,6 +181,15 @@ def calcular_winrates(participantes, personajes, api_url):
         }
     }
 
+    # Asegurar que todos los torneos tengan resultados en BD
+    todos_los_torneos = Torneo.query.all()
+    for torneo in todos_los_torneos:
+        # Si ya tiene resultados, no hace falta consultar
+        if TorneoResultado.query.filter_by(torneo_id=torneo.id).count() > 0:
+            continue
+        # Intentar obtener standings (esto guarda en BD si la API responde)
+        utils.obtener_standings_torneo(torneo, api_url)
+
     # Obtener todos los torneos que tienen resultados (para limitar peticiones)
     torneos_con_resultados = db.session.query(Torneo).join(TorneoResultado).distinct().all()
     torneos_data_cache = {}  # clave: torneo.id, valor: datos de API o None si error
@@ -383,17 +392,19 @@ def calcular_winrates(participantes, personajes, api_url):
             # Buscar el id del participante en los datos de la API
             participant_id_api = None
             for part in data.get('participant', []):
-                if part['name'] == p.nickname:
-                    participant_id_api = part['id']
+                if part and part.get('name') == p.nickname:
+                    participant_id_api = part.get('id')
                     break
             if participant_id_api is None:
                 continue
 
             # --- Estadísticas contra oponente (matches) ---
             for match in data.get('match', []):
+                if match is None:
+                    continue
                 op1 = match.get('opponent1')
                 op2 = match.get('opponent2')
-                if not op1 or not op2:
+                if not op1 or not op2:  # Si falta algún oponente, no se cuenta
                     continue
                 if op1.get('id') == participant_id_api:
                     es_jugador1 = True
@@ -407,8 +418,8 @@ def calcular_winrates(participantes, personajes, api_url):
                 # Obtener nombre del oponente
                 oponente_nombre = None
                 for part in data.get('participant', []):
-                    if part['id'] == oponente_id_api:
-                        oponente_nombre = part['name']
+                    if part and part.get('id') == oponente_id_api:
+                        oponente_nombre = part.get('name')
                         break
                 if not oponente_nombre:
                     continue
@@ -427,16 +438,35 @@ def calcular_winrates(participantes, personajes, api_url):
 
             # --- Estadísticas por personaje: recolectar todos los juegos de este participante en el torneo ---
             juegos_participante = []
-            for game in data.get('match_game', []):
-                op1 = game.get('opponent1')
-                op2 = game.get('opponent2')
-                if not op1 or not op2:
+
+            # Matches sin hijos (child_count == 0)
+            for match in data.get('match', []):
+                if match is None or match.get('child_count', 0) != 0:
                     continue
-                if op1.get('id') == participant_id_api:
+                # Procesar opponent1
+                op1 = match.get('opponent1')
+                if op1 and op1.get('id') == participant_id_api:
                     personaje_id = op1.get('personaje')
                     result = op1.get('result')
                     juegos_participante.append({'personaje': personaje_id, 'result': result})
-                elif op2.get('id') == participant_id_api:
+                # Procesar opponent2
+                op2 = match.get('opponent2')
+                if op2 and op2.get('id') == participant_id_api:
+                    personaje_id = op2.get('personaje')
+                    result = op2.get('result')
+                    juegos_participante.append({'personaje': personaje_id, 'result': result})
+
+            # Match games (para matches con hijos)
+            for game in data.get('match_game', []):
+                if game is None:
+                    continue
+                op1 = game.get('opponent1')
+                op2 = game.get('opponent2')
+                if op1 and op1.get('id') == participant_id_api:
+                    personaje_id = op1.get('personaje')
+                    result = op1.get('result')
+                    juegos_participante.append({'personaje': personaje_id, 'result': result})
+                if op2 and op2.get('id') == participant_id_api:
                     personaje_id = op2.get('personaje')
                     result = op2.get('result')
                     juegos_participante.append({'personaje': personaje_id, 'result': result})
@@ -454,8 +484,7 @@ def calcular_winrates(participantes, personajes, api_url):
                         if personaje_id not in stats['torneos']['por_personaje'][p.id]:
                             stats['torneos']['por_personaje'][p.id][personaje_id] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
                         stats['torneos']['por_personaje'][p.id][personaje_id]['jugados'] += 1
-                        # Determinar si ganó el torneo (ranking==1) - ¿esto cuenta como victoria para el personaje?
-                        # Asumimos que si el participante ganó el torneo, ese torneo completo cuenta como una victoria para el personaje.
+                        # Si ganó el torneo, cuenta como victoria para ese personaje
                         if ranking == 1:
                             stats['torneos']['por_personaje'][p.id][personaje_id]['ganados'] += 1
 
