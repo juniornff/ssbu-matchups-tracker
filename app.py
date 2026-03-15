@@ -927,6 +927,7 @@ def eliminar_torneo(torneo_id):
             TorneoResultado.query.filter_by(torneo_id=torneo.id).delete()
             db.session.delete(torneo)
             db.session.commit()
+            utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
             flash('Torneo eliminado con éxito', 'success')
         except Exception as e:
             db.session.rollback()
@@ -1045,8 +1046,6 @@ def gestion_brackets(torneo_id):
         else:
             flash('Tipo de actualización desconocido', 'danger')
 
-        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
-
         return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
     data = utils.api_request('GET', f"{API_TORNEOS_URL}/stages/{stage_id}")
@@ -1064,6 +1063,9 @@ def gestion_brackets(torneo_id):
     todos_personajes = [{'id': p.id, 'nombre': p.nombre} for p in personajes]
 
     standings_data = utils.obtener_standings_torneo(torneo, API_TORNEOS_URL)
+
+    if not 'error' in standings_data:
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
 
     return render_template('torneo_brackets.html', 
                            torneo=torneo, 

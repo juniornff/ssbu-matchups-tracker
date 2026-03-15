@@ -536,13 +536,13 @@ def calcular_winrates(participantes, personajes, api_url):
                         if ranking == 1:
                             stats['torneos']['por_personaje'][p.id][personaje_id]['ganados'] += 1
 
-                # Estadísticas parciales: cada juego cuenta
-                for juego in juegos_validos:
-                    personaje_id = juego['personaje']
+                # Obtener personajes únicos usados en el torneo
+                personajes_usados_torneo = set(j['personaje'] for j in juegos_validos)
+                for personaje_id in personajes_usados_torneo:
                     if personaje_id not in stats['torneos']['por_personaje_parcial'][p.id]:
                         stats['torneos']['por_personaje_parcial'][p.id][personaje_id] = {'ganados': 0, 'jugados': 0, 'winrate': 0}
                     stats['torneos']['por_personaje_parcial'][p.id][personaje_id]['jugados'] += 1
-                    if juego['result'] == 'win':
+                    if ranking == 1:
                         stats['torneos']['por_personaje_parcial'][p.id][personaje_id]['ganados'] += 1
 
         # Calcular winrates
