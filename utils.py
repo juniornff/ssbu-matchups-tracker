@@ -49,7 +49,7 @@ def generar_Codigo_Secreto():
     return ''.join(random.choices(chars, k=length))
 
 # Función común para actualizar personajes
-def actualizar_personajes_participantes_logic(app):
+def actualizar_personajes_participantes_logic(app, api_url):
 
     # Obtener todos los participantes
     participantes = Participante.query.all()
@@ -72,6 +72,54 @@ def actualizar_personajes_participantes_logic(app):
 
                 if personaje_id:
                     personajes_usados.add(personaje_id)
+        
+        # Obtener torneos en los que participó
+        resultados = TorneoResultado.query.filter_by(participante_id=participante.id).all()
+        for res in resultados:
+            torneo = res.torneo
+            stage_id = torneo.torneo_id_externo
+            # Obtener datos del torneo desde la API
+            stage_data = api_request('GET', f"{api_url}/stages/{stage_id}")
+            if 'error' in stage_data or not stage_data:
+                continue
+            # Buscar el id del participante en la API
+            participant_id_api = None
+            for part in stage_data.get('participant', []):
+                if part and part.get('name') == participante.nickname:
+                    participant_id_api = part.get('id')
+                    break
+            if participant_id_api is None:
+                continue
+            # Matches sin hijos
+            for match in stage_data.get('match', []):
+                if match is None or match.get('child_count', 0) != 0:
+                    continue
+                # opponent1
+                op1 = match.get('opponent1')
+                if op1 and op1.get('id') == participant_id_api:
+                    pid = op1.get('personaje')
+                    if pid:
+                        personajes_usados.add(pid)
+                # opponent2
+                op2 = match.get('opponent2')
+                if op2 and op2.get('id') == participant_id_api:
+                    pid = op2.get('personaje')
+                    if pid:
+                        personajes_usados.add(pid)
+            # Match games
+            for game in stage_data.get('match_game', []):
+                if game is None:
+                    continue
+                op1 = game.get('opponent1')
+                if op1 and op1.get('id') == participant_id_api:
+                    pid = op1.get('personaje')
+                    if pid:
+                        personajes_usados.add(pid)
+                op2 = game.get('opponent2')
+                if op2 and op2.get('id') == participant_id_api:
+                    pid = op2.get('personaje')
+                    if pid:
+                        personajes_usados.add(pid)
 
         # Ahora, actualizar la lista de personajes del participante
         # Primero, eliminamos todos los personajes actuales

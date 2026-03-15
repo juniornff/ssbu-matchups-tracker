@@ -51,7 +51,7 @@ def actualizar_personajes_automatico():
     with app.app_context():
         try:
             app.logger.info(f"{datetime.now()}: Ejecutando actualización automática de personajes...")
-            utils.actualizar_personajes_participantes_logic(app)
+            utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
             app.logger.info(f"{datetime.now()}: Actualización automática de personajes completada")
         except Exception as e:
             app.logger.info(f"{datetime.now()}: Error en actualización automática: {str(e)}")
@@ -181,7 +181,7 @@ def actualizar_personajes_participantes():
     # Obtener todos los participantes
     try:
         app.logger.info("Ejecutando actualización de personajes")
-        utils.actualizar_personajes_participantes_logic(app)
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
         app.logger.info('Personajes de participantes actualizados correctamente')
         flash('Personajes de participantes actualizados correctamente', 'success')
     except Exception as e:
@@ -769,6 +769,7 @@ def gestion_matchups(ronda_id):
 
         db.session.commit()
         flash('Resultados guardados!', 'success')
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
         return redirect(url_for('gestion_matchups', ronda_id=ronda_id))
 
     return render_template('matchups.html', ronda=ronda, todos_personajes=todos_personajes)
@@ -1043,6 +1044,8 @@ def gestion_brackets(torneo_id):
                 flash('Juegos actualizados correctamente', 'success')
         else:
             flash('Tipo de actualización desconocido', 'danger')
+
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
 
         return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
 
