@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h4 class="mb-0">🎮 Crear Cuenta</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('register') }}">
+
+                    <!-- Email -->
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                        <input type="email"
+                               class="form-control"
+                               id="email"
+                               name="email"
+                               value="{{ email or '' }}"
+                               placeholder="tu@email.com"
+                               required
+                               autofocus>
+                        <div class="form-text">Será usado para iniciar sesión.</div>
+                    </div>
+
+                    <!-- Contraseña -->
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password"
+                                   class="form-control"
+                                   id="password"
+                                   name="password"
+                                   placeholder="Mínimo 8 caracteres"
+                                   required
+                                   minlength="8">
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    id="togglePassword"
+                                    title="Mostrar/ocultar contraseña">
+                                <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Confirmar Contraseña -->
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">
+                            Confirmar Contraseña <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="password"
+                                   class="form-control"
+                                   id="password_confirm"
+                                   name="password_confirm"
+                                   placeholder="Repite tu contraseña"
+                                   required>
+                            <button class="btn btn-outline-secondary"
+                                    type="button"
+                                    id="togglePasswordConfirm"
+                                    title="Mostrar/ocultar contraseña">
+                                <i class="bi bi-eye" id="togglePasswordConfirmIcon"></i>
+                            </button>
+                        </div>
+                        <!-- Indicador visual de coincidencia -->
+                        <div id="passwordMatchFeedback" class="form-text"></div>
+                    </div>
+
+                    <!-- Nickname (opcional) -->
+                    <div class="mb-4">
+                        <label for="nickname" class="form-label">Nickname <span class="text-muted">(opcional)</span></label>
+                        <input type="text"
+                               class="form-control"
+                               id="nickname"
+                               name="nickname"
+                               value="{{ nickname or '' }}"
+                               placeholder="Tu nombre en el juego"
+                               maxlength="50">
+                        <div class="form-text">
+                            Si lo proporcionas, se creará tu perfil de jugador.
+                            No podrás usar uno que ya esté en uso.
+                        </div>
+                    </div>
+
+                    <!-- Botón Submit -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            Crear Cuenta
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Footer del card -->
+            <div class="card-footer text-center py-3">
+                <small class="text-muted">
+                    ¿Ya tienes cuenta?
+                    <a href="{{ url_for('login') }}">Inicia sesión</a>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle para mostrar/ocultar contraseña principal
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        const input = document.getElementById('password');
+        const icon = document.getElementById('togglePasswordIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    });
+
+    // Toggle para mostrar/ocultar confirmación de contraseña
+    document.getElementById('togglePasswordConfirm').addEventListener('click', function() {
+        const input = document.getElementById('password_confirm');
+        const icon = document.getElementById('togglePasswordConfirmIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('bi-eye', 'bi-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('bi-eye-slash', 'bi-eye');
+        }
+    });
+
+    // Validación en tiempo real de coincidencia de contraseñas
+    function validarContrasenas() {
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('password_confirm').value;
+        const feedback = document.getElementById('passwordMatchFeedback');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (confirm === '') {
+            feedback.textContent = '';
+            feedback.className = 'form-text';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        if (password === confirm) {
+            feedback.textContent = '✓ Las contraseñas coinciden';
+            feedback.className = 'form-text text-success';
+            submitBtn.disabled = false;
+        } else {
+            feedback.textContent = '✗ Las contraseñas no coinciden';
+            feedback.className = 'form-text text-danger';
+            submitBtn.disabled = true;
+        }
+    }
+
+    document.getElementById('password').addEventListener('input', validarContrasenas);
+    document.getElementById('password_confirm').addEventListener('input', validarContrasenas);
+</script>
+{% endblock %}

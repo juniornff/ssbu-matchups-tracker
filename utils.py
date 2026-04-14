@@ -1,10 +1,15 @@
 from collections import defaultdict, deque
-from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match
+from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match, TipoUsuario, Usuario
 import random, string
 import requests
 import json
+import os
 from flask import current_app
+from flask_bcrypt import Bcrypt
+from datetime import datetime
 
+# Instancia de Bcrypt (se inicializa con la app en app.py)
+bcrypt = Bcrypt()
 
 # Lista de personajes para inicializar la base de datos
 PERSONAJES = [
@@ -38,6 +43,107 @@ def seed_personajes():
 
     db.session.commit()
     return count
+
+# Tipos de usuario iniciales del sistema
+TIPOS_USUARIO = [
+    "Admin",
+    "Líder de liga",
+    "Participante",
+    "Espectador"
+]
+
+def seed_tipos_usuario():
+    """
+    Inserta los tipos de usuario iniciales en la base de datos si no existen.
+    Los tipos iniciales son: Admin, Líder de liga, Participante.
+    Retorna el número de tipos creados.
+    """
+    count = 0
+    for nombre in TIPOS_USUARIO:
+        if not TipoUsuario.query.filter_by(nombre=nombre).first():
+            tipo = TipoUsuario(nombre=nombre)
+            db.session.add(tipo)
+            count += 1
+
+    db.session.commit()
+    return count
+
+
+def seed_admin(app):
+    """
+    Crea el primer usuario Admin si no existe ningún usuario con tipo Admin.
+
+    Lee las credenciales desde variables de entorno:
+    - ADMIN_EMAIL: email del usuario Admin
+    - ADMIN_PASSWORD: contraseña del usuario Admin
+
+    Si no se proporcionan, genera valores aleatorios y los imprime en consola
+    para que el administrador pueda usarlos en el primer acceso.
+
+    Args:
+        app: instancia de la aplicación Flask (para acceso al logger)
+    """
+
+    # Obtener el tipo Admin de la BD
+    tipo_admin = TipoUsuario.query.filter_by(nombre='Admin').first()
+    if not tipo_admin:
+        app.logger.error('No se encontró el tipo de usuario Admin en la BD. '
+                         'Asegúrate de ejecutar seed_tipos_usuario() primero.')
+        return
+
+    # Verificar si ya existe algún usuario Admin
+    admin_existente = Usuario.query.filter_by(tipo_id=tipo_admin.id).first()
+    if admin_existente:
+        app.logger.info('Ya existe un usuario Admin. No se creará uno nuevo.')
+        return
+
+    # --- Leer credenciales desde variables de entorno ---
+    admin_email = os.environ.get('ADMIN_EMAIL')
+    admin_password = os.environ.get('ADMIN_PASSWORD')
+
+    # Bandera para saber si se generaron valores aleatorios
+    credenciales_generadas = False
+
+    # Generar email aleatorio si no se proporcionó
+    if not admin_email:
+        sufijo = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        admin_email = f'admin_{sufijo}@smash.local'
+        credenciales_generadas = True
+
+    # Generar contraseña aleatoria si no se proporcionó
+    if not admin_password:
+        # Contraseña de 16 caracteres con letras, números y símbolos seguros
+        chars = string.ascii_letters + string.digits + '!@#$%^&*'
+        admin_password = ''.join(random.choices(chars, k=16))
+        credenciales_generadas = True
+
+    # --- Crear el usuario Admin ---
+    password_hash = bcrypt.generate_password_hash(admin_password).decode('utf-8')
+
+    admin = Usuario(
+        email=admin_email,
+        password_hash=password_hash,
+        tipo_id=tipo_admin.id,
+        activo=True,
+        # El Admin inicial se crea con email verificado para permitir
+        # el primer acceso sin necesidad de SMTP (aún no implementado)
+        email_verificado=True,
+        participante_id=None
+    )
+
+    db.session.add(admin)
+    db.session.commit()
+
+    # --- Informar al administrador ---
+    if credenciales_generadas:
+        app.logger.warning('=' * 60)
+        app.logger.warning('CREDENCIALES DEL ADMIN GENERADAS AUTOMÁTICAMENTE')
+        app.logger.warning('Guárdalas en un lugar seguro y cámbialas después.')
+        app.logger.warning(f'  Email:      {admin_email}')
+        app.logger.warning(f'  Contraseña: {admin_password}')
+        app.logger.warning('=' * 60)
+    else:
+        app.logger.info(f'Usuario Admin creado exitosamente con email: {admin_email}')
 
 def generar_Codigo_Secreto():
     """
@@ -648,13 +754,22 @@ def init_db(app):
         db.create_all()
         app.logger.info("Tablas de la base de datos creadas")
 
-        # Verificar si ya existen personajes en la base de datos
-        from models import Personaje
+        # --- Seed de personajes ---
         cantidad_personajes = Personaje.query.count()
-
         if cantidad_personajes < len(PERSONAJES):
             # Agregar personajes solo si la la cantidad de personajes es menor a la inicial
             count = seed_personajes()
             app.logger.info(f"Se agregaron {count} personajes a la base de datos")
         else:
             app.logger.info(f"Ya existen {cantidad_personajes} personajes en la base de datos. No se ejecutó seed_personajes.")
+        
+        # --- Seed de tipos de usuario ---
+        cantidad_tipos = TipoUsuario.query.count()
+        if cantidad_tipos < TIPOS_USUARIO.__len__():
+            count = seed_tipos_usuario()
+            app.logger.info(f"Se agregaron {count} tipos de usuario a la base de datos")
+        else:
+            app.logger.info(f"Ya existen {cantidad_tipos} tipos de usuario. No se ejecutó seed_tipos_usuario.")
+
+        # --- Seed del Admin inicial ---
+        seed_admin(app)

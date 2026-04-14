@@ -1,30 +1,64 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session
 import os
-from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match
+from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torneo, TorneoResultado, Match, TipoUsuario, Usuario
 import utils
+from utils import bcrypt
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import atexit
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
-# Crear la aplicación Flask
+# =============================================================================
+# Configuración de la aplicación Flask
+# =============================================================================
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'smash.db')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or utils.generar_Codigo_Secreto()
 app.logger.info(f"SECRET_KEY: {app.config['SECRET_KEY']}")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Duración de la sesión (configurable via variable de entorno SESSION_LIFETIME_HOURS, por defecto 24h)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=int(os.environ.get('SESSION_LIFETIME_HOURS', 24)))
 
 # Asegurar que el directorio de instancias exista
 os.makedirs(app.instance_path, exist_ok=True)
 
+# =============================================================================
+# Inicialización de extensiones
+# =============================================================================
+
 # Inicializar la base de datos con la app
 db.init_app(app)
+
+# Bcrypt para hashing de contraseñas
+bcrypt.init_app(app)
+
+# Flask-Login para gestión de sesiones de usuario
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'  # Ruta a la que redirigir si no está autenticado
+login_manager.login_message = 'Por favor inicia sesión para acceder a esta página.'
+login_manager.login_message_category = 'warning'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    """
+    Callback requerido por Flask-Login para recargar el usuario
+    desde la BD usando el ID almacenado en la sesión.
+    """
+    return Usuario.query.get(int(user_id))
+
 
 # Ejecutar la inicialización al importar
 utils.init_db(app)
 
-# Configuración del scheduler
+# =============================================================================
+# Configuración del Scheduler (tareas programadas)
+# =============================================================================
+
 scheduler = BackgroundScheduler()
 scheduler.start()
 
@@ -67,6 +101,9 @@ scheduler.add_job(
 # Apagar el scheduler cuando la aplicación se cierre
 atexit.register(lambda: scheduler.shutdown())
 
+# =============================================================================
+# Filtros y Context Processors
+# =============================================================================
 
 @app.template_filter('get_attr')
 def get_attr_filter(obj, attr):
@@ -78,12 +115,171 @@ def get_attr_filter(obj, attr):
 def inject_ronda_actual():
     return dict(ronda_actual_id=ronda_actual_id)
 
+# =============================================================================
+# Rutas del favicon
+# =============================================================================
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+# =============================================================================
+# Rutas de Autenticación
+# =============================================================================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """
+    GET:  Muestra el formulario de login.
+    POST: Valida credenciales e inicia sesión si son correctas.
+
+    Verificaciones en orden:
+    1. El email existe en la BD.
+    2. La contraseña es correcta.
+    3. El email está verificado (cuenta activada).
+    4. La cuenta está activa (no desactivada por un admin).
+    """
+    # Si ya está autenticado, redirigir al index
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        remember = 'remember' in request.form
+
+        # Buscar usuario por email
+        usuario = Usuario.query.filter_by(email=email).first()
+
+        # Mensaje genérico para no revelar si el email existe
+        if not usuario or not bcrypt.check_password_hash(usuario.password_hash, password):
+            flash('Email o contraseña incorrectos.', 'danger')
+            return render_template('login.html', email=email)
+
+        # Verificar que el email esté verificado
+        if not usuario.email_verificado:
+            flash('Debes verificar tu email antes de iniciar sesión.', 'warning')
+            return render_template('login.html', email=email)
+
+        # Verificar que la cuenta esté activa
+        if not usuario.activo:
+            flash('Tu cuenta está desactivada. Contacta al administrador.', 'danger')
+            return render_template('login.html', email=email)
+
+        # Iniciar sesión
+        login_user(usuario, remember=remember)
+        session.permanent = True
+
+        # Actualizar fecha de último login
+        usuario.fecha_ultimo_login = datetime.now()
+        db.session.commit()
+
+        app.logger.info(f"Login exitoso: {usuario.email}")
+
+        # Redirigir a la página que intentaba acceder, o al index
+        next_page = request.args.get('next')
+        return redirect(next_page) if next_page else redirect(url_for('index'))
+
+    return render_template('login.html')
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """
+    GET:  Muestra el formulario de registro.
+    POST: Valida los datos y crea la cuenta de usuario.
+
+    El registro es abierto. Todos los usuarios nuevos son tipo 'Participante'.
+    Si se proporciona un nickname, se crea y vincula un Participante.
+    No se inicia sesión automáticamente: se redirige al login.
+
+    NOTA TEMPORAL: email_verificado=True hasta implementar SMTP.
+    """
+    # Si ya está autenticado, redirigir al index
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        password_confirm = request.form.get('password_confirm', '')
+        nickname = request.form.get('nickname', '').strip()
+
+        # --- Validaciones de campos ---
+        if not email or not password:
+            flash('Email y contraseña son requeridos.', 'danger')
+            return render_template('register.html', email=email, nickname=nickname)
+
+        if len(password) < 8:
+            flash('La contraseña debe tener al menos 8 caracteres.', 'danger')
+            return render_template('register.html', email=email, nickname=nickname)
+
+        if password != password_confirm:
+            flash('Las contraseñas no coinciden.', 'danger')
+            return render_template('register.html', email=email, nickname=nickname)
+
+        # --- Verificar unicidad del email ---
+        if Usuario.query.filter_by(email=email).first():
+            flash('Este email ya está registrado.', 'danger')
+            return render_template('register.html', email=email, nickname=nickname)
+
+        # --- Verificar y crear Participante si se proporcionó nickname ---
+        participante = None
+        if nickname:
+            if Participante.query.filter_by(nickname=nickname).first():
+                flash('Este nickname ya está en uso. Elige otro o déjalo vacío.', 'danger')
+                return render_template('register.html', email=email, nickname=nickname)
+            participante = Participante(nickname=nickname)
+            db.session.add(participante)
+            db.session.flush()  # Obtener el ID antes del commit
+            nameTipoParticipante = 'Participante'
+        else:
+            nameTipoParticipante = 'Espectador'
+
+        # --- Obtener tipo 'Participante' por defecto ---
+        tipo_participante = TipoUsuario.query.filter_by(nombre=nameTipoParticipante).first()
+        if not tipo_participante:
+            app.logger.error(f"No se encontró el tipo '{nameTipoParticipante}' en la BD.")
+            flash('Error de configuración del sistema. Contacta al administrador.', 'danger')
+            db.session.rollback()
+            return render_template('register.html', email=email, nickname=nickname)
+
+        # --- Crear el usuario ---
+        password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        usuario = Usuario(
+            email=email,
+            password_hash=password_hash,
+            tipo_id=tipo_participante.id,
+            activo=True,
+            # TEMPORAL: email_verificado=True hasta implementar SMTP.
+            # Cuando se implemente SMTP, cambiar a False y enviar token.
+            email_verificado=True,
+            participante_id=participante.id if participante else None
+        )
+        db.session.add(usuario)
+        db.session.commit()
+
+        app.logger.info(f"Nuevo usuario registrado: {email}")
+        flash('¡Cuenta creada exitosamente! Ya puedes iniciar sesión.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Cierra la sesión del usuario actual y redirige al login."""
+    app.logger.info(f"Logout: {current_user.email}")
+    logout_user()
+    flash('Sesión cerrada exitosamente.', 'success')
+    return redirect(url_for('login'))
+
+# =============================================================================
 # Index
+# =============================================================================
+
 @app.route('/')
 def index():
     global ronda_actual_id
@@ -125,8 +321,10 @@ def configurar_ronda_actual():
     flash('Ronda actual configurada correctamente!', 'success')
     return redirect(url_for('index'))
 
-
+# =============================================================================
 # Participantes
+# =============================================================================
+
 # Index Participantes
 @app.route('/participantes', methods=['GET', 'POST'])
 def gestion_participantes():
@@ -252,7 +450,10 @@ def borrar_participante(id):
 
     return redirect(url_for('gestion_participantes'))
 
+# =============================================================================
 # Personajes
+# =============================================================================
+
 # Index Personajes
 @app.route('/personajes', methods=['GET', 'POST'])
 def gestion_personajes():
@@ -337,7 +538,10 @@ def eliminar_personaje(id):
 
     return redirect(url_for('gestion_personajes'))
 
-# Evento
+# =============================================================================
+# Eventos
+# =============================================================================
+
 # Index Evento
 @app.route('/eventos', methods=['GET', 'POST'])
 def gestion_eventos():
@@ -497,7 +701,10 @@ def eliminar_evento(id):
 
     return redirect(url_for('gestion_eventos'))
 
+# =============================================================================
 # Rondas
+# =============================================================================
+
 # Index Rondas
 @app.route('/evento/rondas/<int:evento_id>', methods=['GET', 'POST'])
 def gestion_rondas(evento_id):
@@ -631,7 +838,10 @@ def eliminar_ronda(id):
     flash('Ronda eliminada!', 'success')
     return redirect(url_for('gestion_rondas', evento_id=evento_id))
 
+# =============================================================================
 # Matchups
+# =============================================================================
+
 # Index Matchups
 @app.route('/evento/ronda/matchups/<int:ronda_id>', methods=['GET', 'POST'])
 def gestion_matchups(ronda_id):
@@ -774,7 +984,10 @@ def gestion_matchups(ronda_id):
 
     return render_template('matchups.html', ronda=ronda, todos_personajes=todos_personajes)
 
-# Torneos (Aun no implementado)
+# =============================================================================
+# Torneos
+# =============================================================================
+
 # Se planea usar https://github.com/Drarig29/brackets-manager.js
 @app.route('/evento/torneos/<int:evento_id>', methods=['GET', 'POST'])
 def gestion_torneos(evento_id):
@@ -1074,7 +1287,10 @@ def gestion_brackets(torneo_id):
                            todos_personajes=todos_personajes,
                            standings_data=standings_data)
 
-# Estadisticas
+# =============================================================================
+# Estadísticas
+# =============================================================================
+
 # Index Estadisticas
 @app.route('/estadisticas')
 def mostrar_estadisticas():
@@ -1101,7 +1317,10 @@ def mostrar_estadisticas():
                           personajes=personajes,
                           mensaje=None)
 
+# =============================================================================
 # Historial
+# =============================================================================
+
 # No hay index Historial
 @app.route('/historial')
 def historial_redirect():

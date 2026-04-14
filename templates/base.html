@@ -47,6 +47,57 @@
                         <a class="nav-link" href="{{ url_for('mostrar_estadisticas') }}">Estadísticas</a>
                     </li>
                 </ul>
+
+                <!-- Sesión de usuario (derecha) -->
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                        <!-- Dropdown del usuario autenticado -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown"
+                               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <!-- Mostrar nickname si tiene participante vinculado, sino el email -->
+                                👤
+                                {% if current_user.participante %}
+                                    {{ current_user.participante.nickname }}
+                                {% else %}
+                                    {{ current_user.email }}
+                                {% endif %}
+                                <!-- Badge con el tipo de usuario -->
+                                <span class="badge
+                                    {% if current_user.tipo.nombre == 'Admin' %}bg-danger
+                                    {% elif current_user.tipo.nombre == 'Líder de liga' %}bg-warning text-dark
+                                    {% else %}bg-secondary
+                                    {% endif %} ms-1">
+                                    {{ current_user.tipo.nombre }}
+                                </span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li>
+                                    <span class="dropdown-item-text text-muted small">
+                                        {{ current_user.email }}
+                                    </span>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                                        🚪 Cerrar Sesión
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <!-- Links de login/registro para usuarios no autenticados -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}">Registrarse</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link"
+                               href="{{ url_for('login') }}">
+                                Iniciar Sesión
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
             </div>
         </div>
     </nav>

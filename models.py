@@ -1,7 +1,105 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
 from datetime import datetime
 
 db = SQLAlchemy()
+
+class TipoUsuario(db.Model):
+    """
+    Representa el tipo/rol de un usuario en el sistema.
+    Los permisos por tipo se definen manualmente en el código por acción.
+    Ejemplos de tipos iniciales: Admin, Líder de liga, Participante.
+    """
+    __tablename__ = 'tipo_usuario'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), unique=True, nullable=False)
+
+    # Relación inversa: usuarios de este tipo
+    usuarios = db.relationship('Usuario', backref='tipo', lazy=True)
+
+    def __repr__(self):
+        return f'<TipoUsuario {self.nombre}>'
+
+
+class Usuario(UserMixin, db.Model):
+    """
+    Representa una cuenta de usuario del sistema.
+    Un usuario puede o no estar vinculado a un Participante.
+    La verificación de email y la recuperación de contraseña
+    se gestionan mediante tokens con expiración.
+    
+    Campos de autenticación:
+    - email: identificador único para login
+    - password_hash: contraseña hasheada con bcrypt
+    - activo: permite desactivar cuentas sin eliminarlas
+    - email_verificado: la cuenta está bloqueada hasta que se verifique
+
+    Campos para verificación de email (para uso futuro con SMTP):
+    - token_verificacion: token único enviado al email al registrarse
+    - token_verificacion_expiracion: fecha límite para usar el token
+
+    Campos para recuperación de contraseña (para uso futuro con SMTP):
+    - token_recuperacion: token único enviado al email para resetear contraseña
+    - token_recuperacion_expiracion: fecha límite para usar el token
+    """
+    __tablename__ = 'usuario'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # --- Credenciales ---
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    # --- Estado de la cuenta ---
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+
+    # --- Verificación de email ---
+    # Indica si el usuario ha verificado su email
+    # La cuenta está bloqueada para login hasta que sea True
+    email_verificado = db.Column(db.Boolean, default=False, nullable=False)
+    # Token enviado al email para verificar la cuenta
+    token_verificacion = db.Column(db.String(256), unique=True, nullable=True)
+    # Fecha límite para usar el token de verificación
+    token_verificacion_expiracion = db.Column(db.DateTime, nullable=True)
+
+    # --- Recuperación de contraseña ---
+    # Token enviado al email para restablecer la contraseña
+    token_recuperacion = db.Column(db.String(256), unique=True, nullable=True)
+    # Fecha límite para usar el token de recuperación
+    token_recuperacion_expiracion = db.Column(db.DateTime, nullable=True)
+
+    # --- Relaciones ---
+    # Tipo de usuario (Admin, Líder de liga, Participante, etc.)
+    tipo_id = db.Column(db.Integer, db.ForeignKey('tipo_usuario.id'), nullable=False)
+
+    # Participante vinculado (opcional, único: un usuario <-> un participante)
+    participante_id = db.Column(
+        db.Integer,
+        db.ForeignKey('participante.id'),
+        nullable=True,
+        unique=True  # Un participante no puede tener más de un usuario
+    )
+    participante = db.relationship(
+        'Participante',
+        backref=db.backref('usuario', uselist=False)  # Acceso inverso: participante.usuario
+    )
+
+    # --- Auditoría ---
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    fecha_ultimo_login = db.Column(db.DateTime, nullable=True)
+
+    @property
+    def is_active(self):
+        """
+        Flask-Login llama a esta propiedad para saber si el usuario puede
+        autenticarse. Se requiere que la cuenta esté activa Y con email verificado.
+        """
+        return self.activo and self.email_verificado
+
+    def __repr__(self):
+        return f'<Usuario {self.email}>'
+
 
 class Participante(db.Model):
     id = db.Column(db.Integer, primary_key=True)
