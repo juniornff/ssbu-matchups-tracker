@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="text-center py-5">
-    <h1 class="display-4">Bienvenidos Charles Family SSB League </h1>
+    <h1 class="display-4">Bienvenidos {{ comunity_name }} </h1>
     <p class="lead">Organiza y registra tus encuentros de Super Smash Bros Ultimate</p>
     <hr class="my-4">
 
@@ -13,9 +13,11 @@
             <div class="card border-primary">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Matches Actuales</h5>
+                    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
                     <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#configurarRondaModal">
                         ⚙️
                     </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <p class="card-text">Accede rápidamente a los matches de la ronda actual</p>
@@ -94,11 +96,6 @@
                 </optgroup>
               {% endfor %}
             </select>
-          </div>
-
-          <div class="mb-3">
-            <label for="codigoSecreto" class="form-label">Código Secreto</label>
-            <input type="password" class="form-control" id="codigoSecreto" name="codigo_secreto" required>
           </div>
         </div>
         <div class="modal-footer">

@@ -133,7 +133,6 @@
                                 <label>Personaje</label>
                                 <select class="form-select personaje-select" name="opponent1_character" id="opponent1CharacterSinHijos">
                                     <option value="">Selecciona</option>
-                                    <!-- Las opciones se llenarán con JavaScript desde todosPersonajes -->
                                 </select>
                             </div>
                         </div>
@@ -154,7 +153,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="submit" class="btn btn-primary" id="submitSinHijos">Guardar</button>
                 </div>
             </form>
         </div>
@@ -179,7 +178,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="submit" class="btn btn-primary" id="submitConHijos">Guardar</button>
                 </div>
             </form>
         </div>
@@ -193,7 +192,10 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 
 <script>
-    // Función similar a la de matchups.html para esperar a que TomSelect esté listo
+    const isAuthenticated = {{ current_user.is_authenticated|tojson }};
+    const userTipo = {{ current_user.tipo.nombre|tojson if current_user.is_authenticated else 'null' }};
+    const puedeEditar = isAuthenticated && userTipo && ['Admin', 'Líder de liga', 'Participante'].includes(userTipo);
+    
     window.tomSelectReady = false;
     window.tomSelectCallbacks = [];
 
@@ -221,7 +223,7 @@
         // Datos recibidos del backend
         const stageData = {{ stage_data|tojson }};
         const currentMatches = {{ current_matches|tojson }};
-        const todosPersonajes = {{ todos_personajes|tojson }};  // lista de {id, nombre}
+        const todosPersonajes = {{ todos_personajes|tojson }};
 
         // Mapa de participantes
         const participantMap = {};
@@ -273,8 +275,21 @@
             });
         }
 
-        // Función para llenar un select con opciones de personajes y pre-seleccionar un valor
+        function destroyTomSelect(containerSelector) {
+            document.querySelectorAll(containerSelector + ' .personaje-select').forEach(el => {
+                if (el.tomselect) {
+                    el.tomselect.destroy();
+                    delete el.tomselect;
+                }
+            });
+        }
+
         function fillCharacterSelect(selectElement, selectedValue) {
+            // Destruir TomSelect existente
+            if (selectElement.tomselect) {
+                selectElement.tomselect.destroy();
+                delete selectElement.tomselect;
+            }
             selectElement.innerHTML = '<option value="">Selecciona</option>';
             todosPersonajes.forEach(p => {
                 const option = document.createElement('option');
@@ -287,27 +302,24 @@
             });
         }
 
-        // Función para inicializar TomSelect en un contenedor
-        function initTomSelect(containerSelector) {
-            onTomSelectReady(() => {
-                document.querySelectorAll(containerSelector + ' .personaje-select').forEach(el => {
-                    if (!el.tomselect) {
-                        new TomSelect(el, {
-                            valueField: 'id',
-                            labelField: 'nombre',
-                            searchField: 'nombre',
-                            options: todosPersonajes,
-                            create: false,
-                            placeholder: 'Selecciona personaje',
-                            render: {
-                                option: function(item, escape) {
-                                    return '<div>' + escape(item.nombre) + '</div>';
-                                }
-                            }
-                        });
+        function createTomSelect(selectElement, disabled = false) {
+            if (selectElement.tomselect) return;
+            const ts = new TomSelect(selectElement, {
+                valueField: 'id',
+                labelField: 'nombre',
+                searchField: 'nombre',
+                options: todosPersonajes,
+                create: false,
+                placeholder: 'Selecciona personaje',
+                render: {
+                    option: function(item, escape) {
+                        return '<div>' + escape(item.nombre) + '</div>';
                     }
-                });
+                }
             });
+            if (disabled) {
+                ts.disable();
+            }
         }
 
         // Función para sincronizar los valores de TomSelect con los selects nativos
@@ -342,19 +354,34 @@
                 document.getElementById('matchSinHijosId').value = matchId;
                 document.getElementById('opponent1NameSinHijos').textContent = opponent1 ? (participantMap[opponent1.id] || 'Desconocido') : 'BYE';
                 document.getElementById('opponent2NameSinHijos').textContent = opponent2 ? (participantMap[opponent2.id] || 'Desconocido') : 'BYE';
-                // Poner puntajes existentes si los hay
-                document.querySelector('input[name="opponent1_score"]').value = opponent1 && opponent1.score !== undefined ? opponent1.score : 0;
-                document.querySelector('input[name="opponent2_score"]').value = opponent2 && opponent2.score !== undefined ? opponent2.score : 0;
-                // Obtener personajes previos si existen (asumiendo que están en opponent1.personaje y opponent2.personaje)
+                
+                const score1Input = document.querySelector('input[name="opponent1_score"]');
+                const score2Input = document.querySelector('input[name="opponent2_score"]');
+                score1Input.value = opponent1 && opponent1.score !== undefined ? opponent1.score : 0;
+                score2Input.value = opponent2 && opponent2.score !== undefined ? opponent2.score : 0;
+                
                 const prevChar1 = opponent1 && opponent1.personaje ? opponent1.personaje : '';
                 const prevChar2 = opponent2 && opponent2.personaje ? opponent2.personaje : '';
-                // Llenar selects con personajes y pre-seleccionar los valores previos
-                fillCharacterSelect(document.getElementById('opponent1CharacterSinHijos'), prevChar1);
-                fillCharacterSelect(document.getElementById('opponent2CharacterSinHijos'), prevChar2);
-                // Inicializar TomSelect
-                setTimeout(() => {
-                    initTomSelect('#modalMatchSinHijos');
-                }, 100);
+                
+                const select1 = document.getElementById('opponent1CharacterSinHijos');
+                const select2 = document.getElementById('opponent2CharacterSinHijos');
+                fillCharacterSelect(select1, prevChar1);
+                fillCharacterSelect(select2, prevChar2);
+                
+                onTomSelectReady(() => {
+                    createTomSelect(select1, !puedeEditar);
+                    createTomSelect(select2, !puedeEditar);
+                    
+                    if (!puedeEditar) {
+                        score1Input.disabled = true;
+                        score2Input.disabled = true;
+                        document.getElementById('submitSinHijos').disabled = true;
+                    } else {
+                        score1Input.disabled = false;
+                        score2Input.disabled = false;
+                        document.getElementById('submitSinHijos').disabled = false;
+                    }
+                });
                 modal.show();
             } else {
                 // Modal con hijos
@@ -366,18 +393,18 @@
                 const modal = new bootstrap.Modal(document.getElementById('modalMatchConHijos'));
                 document.getElementById('matchConHijosId').value = matchId;
                 const container = document.getElementById('hijosContainer');
-                container.innerHTML = ''; // Limpiar
-
-                // Generar campos para cada juego hijo
+                container.innerHTML = '';
+                
                 matchGames.forEach((game, index) => {
-                    const gameDiv = document.createElement('div');
-                    gameDiv.className = 'card mb-3';
                     // Obtener puntajes actuales si existen
                     const score1 = game.opponent1 && game.opponent1.score !== undefined ? game.opponent1.score : 0;
                     const score2 = game.opponent2 && game.opponent2.score !== undefined ? game.opponent2.score : 0;
                     // Obtener personajes previos si existen
                     const prevChar1 = game.opponent1 && game.opponent1.personaje ? game.opponent1.personaje : '';
                     const prevChar2 = game.opponent2 && game.opponent2.personaje ? game.opponent2.personaje : '';
+                    
+                    const gameDiv = document.createElement('div');
+                    gameDiv.className = 'card mb-3';
                     gameDiv.innerHTML = `
                         <div class="card-header">Juego ${index + 1}</div>
                         <div class="card-body">
@@ -399,14 +426,25 @@
                         </div>
                     `;
                     container.appendChild(gameDiv);
-                    // Llenar selects de personajes con pre-selección
-                    fillCharacterSelect(document.getElementById(`opponent1Char_${index}`), prevChar1);
-                    fillCharacterSelect(document.getElementById(`opponent2Char_${index}`), prevChar2);
+                    
+                    const select1 = document.getElementById(`opponent1Char_${index}`);
+                    const select2 = document.getElementById(`opponent2Char_${index}`);
+                    fillCharacterSelect(select1, prevChar1);
+                    fillCharacterSelect(select2, prevChar2);
                 });
-                // Inicializar TomSelect en los nuevos selects
-                setTimeout(() => {
-                    initTomSelect('#modalMatchConHijos');
-                }, 100);
+                
+                onTomSelectReady(() => {
+                    document.querySelectorAll('#modalMatchConHijos .personaje-select').forEach(select => {
+                        createTomSelect(select, !puedeEditar);
+                    });
+                    if (!puedeEditar) {
+                        document.querySelectorAll('#modalMatchConHijos input[type="number"]').forEach(input => input.disabled = true);
+                        document.getElementById('submitConHijos').disabled = true;
+                    } else {
+                        document.querySelectorAll('#modalMatchConHijos input[type="number"]').forEach(input => input.disabled = false);
+                        document.getElementById('submitConHijos').disabled = false;
+                    }
+                });
                 modal.show();
             }
         };

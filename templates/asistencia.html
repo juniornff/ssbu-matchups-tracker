@@ -23,7 +23,9 @@
         </div>
     </div>
 
+    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
     <button type="submit" class="btn btn-primary">Guardar Asistencia</button>
+    {% endif %}
     <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
 </form>
 {% endblock %}

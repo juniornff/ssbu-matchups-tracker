@@ -4,12 +4,59 @@ import random, string
 import requests
 import json
 import os
-from flask import current_app
+from flask import current_app, flash
 from flask_bcrypt import Bcrypt
+from flask_login import current_user
 from datetime import datetime
 
 # Instancia de Bcrypt (se inicializa con la app en app.py)
 bcrypt = Bcrypt()
+
+# =============================================================================
+# Constantes de permisos por tipo de usuario
+# =============================================================================
+
+# Solo administradores del sistema
+TIPOS_ADMIN = ('Admin',)
+
+# Administradores y líderes de liga
+TIPOS_ADMIN_LIDER = ('Admin', 'Líder de liga')
+
+# Todos los usuarios autenticados con un rol activo en la liga
+TIPOS_TODOS_AUTENTICADOS = ('Admin', 'Líder de liga', 'Participante')
+
+
+def verificar_permiso_tipo(*tipos_permitidos):
+    """
+    Verifica que el usuario actual tenga uno de los tipos de usuario permitidos.
+
+    Debe llamarse dentro de una vista de Flask donde current_user esté disponible.
+    Si el usuario no está autenticado o no tiene el tipo requerido, registra
+    un flash message de error.
+
+    Args:
+        *tipos_permitidos: nombres de los tipos de usuario que pueden
+                           realizar la acción (ej: 'Admin', 'Líder de liga').
+
+    Returns:
+        bool: True si el usuario tiene permiso, False en caso contrario.
+
+    Ejemplo de uso:
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+            return redirect(url_for('index'))
+    """
+    if not current_user.is_authenticated:
+        flash('Debes iniciar sesión para realizar esta acción.', 'warning')
+        return False
+    if current_user.tipo.nombre not in tipos_permitidos:
+        flash('No tienes permisos para realizar esta acción.', 'danger')
+        return False
+    return True
+
+
+# =============================================================================
+# Listas de datos iniciales
+# =============================================================================
 
 # Lista de personajes para inicializar la base de datos
 PERSONAJES = [
@@ -153,6 +200,10 @@ def generar_Codigo_Secreto():
     length = random.randint(6, 12)
     chars = string.ascii_letters + string.digits + string.punctuation
     return ''.join(random.choices(chars, k=length))
+
+# =============================================================================
+# Lógica de negocio
+# =============================================================================
 
 # Función común para actualizar personajes
 def actualizar_personajes_participantes_logic(app, api_url):

@@ -63,15 +63,14 @@ scheduler = BackgroundScheduler()
 scheduler.start()
 
 # Variables
-# Codigo secreto para acciones sensibles
-Codigo_Secreto = os.environ.get('SECRET_CODE') or utils.generar_Codigo_Secreto()
-app.logger.info(f"SECRET_CODE: {Codigo_Secreto}")
+# Nombre comunidad o liga
+COMUNITY_NAME = os.environ.get('COMUNITY_NAME') or 'Jugadores de la liga'
 # Variable que indica que Ronda usar para el boton en Index
 ronda_actual_id = None
 # Variable ajustable para el intervalo (en horas)
 INTERVALO_ACTUALIZACION_HORAS = 24
 # Variable para el URL del API de Torneos
-API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://localhost:3000'
+API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://tournament-server:3000'
 
 with app.app_context():
     app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
@@ -178,6 +177,7 @@ def login():
         app.logger.info(f"Login exitoso: {usuario.email}")
 
         # Redirigir a la página que intentaba acceder, o al index
+        flash('Inicio de sesión exitoso.', 'success')
         next_page = request.args.get('next')
         return redirect(next_page) if next_page else redirect(url_for('index'))
 
@@ -233,14 +233,12 @@ def register():
             participante = Participante(nickname=nickname)
             db.session.add(participante)
             db.session.flush()  # Obtener el ID antes del commit
-            nameTipoParticipante = 'Participante'
-        else:
-            nameTipoParticipante = 'Espectador'
 
-        # --- Obtener tipo 'Participante' por defecto ---
-        tipo_participante = TipoUsuario.query.filter_by(nombre=nameTipoParticipante).first()
+        # Determinar tipo según si el usuario proporcionó nickname
+        nombre_tipo = 'Participante' if nickname else 'Espectador'
+        tipo_participante = TipoUsuario.query.filter_by(nombre=nombre_tipo).first()
         if not tipo_participante:
-            app.logger.error(f"No se encontró el tipo '{nameTipoParticipante}' en la BD.")
+            app.logger.error(f"No se encontró el tipo '{nombre_tipo}' en la BD.")
             flash('Error de configuración del sistema. Contacta al administrador.', 'danger')
             db.session.rollback()
             return render_template('register.html', email=email, nickname=nickname)
@@ -260,7 +258,7 @@ def register():
         db.session.add(usuario)
         db.session.commit()
 
-        app.logger.info(f"Nuevo usuario registrado: {email}")
+        app.logger.info(f"Nuevo usuario registrado: {email} (tipo: {nombre_tipo})")
         flash('¡Cuenta creada exitosamente! Ya puedes iniciar sesión.', 'success')
         return redirect(url_for('login'))
 
@@ -297,21 +295,26 @@ def index():
 
     return render_template('index.html',
                          ronda_actual_id=ronda_actual_id,
-                         eventos=eventos)
+                         eventos=eventos,
+                         comunity_name=COMUNITY_NAME)
 
 # Configurar Ronda Actual en Index
 @app.route('/configurar_ronda_actual', methods=['POST'])
 def configurar_ronda_actual():
+    """
+    Configura la ronda actual para acceso rápido desde el Index.
+
+    No requiere autenticación obligatoria, pero solo usuarios con tipo
+    Admin o Líder de liga pueden realizar la acción.
+    """
     global ronda_actual_id
 
-    codigo = request.form.get('codigo_secreto', '')
-    ronda_id = request.form.get('ronda_id')
-
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
+    # Verificar permiso sin requerir login obligatorio en la ruta
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
         return redirect(url_for('index'))
 
     # Verificar que la ronda existe
+    ronda_id = request.form.get('ronda_id')
     ronda = Ronda.query.get(ronda_id)
     if not ronda:
         flash('Ronda no encontrada', 'danger')
@@ -327,7 +330,13 @@ def configurar_ronda_actual():
 
 # Index Participantes
 @app.route('/participantes', methods=['GET', 'POST'])
+@login_required
 def gestion_participantes():
+
+    # Verificar que solo Admin puede acceder a esta sección (GET y POST)
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         nickname = request.form['nickname']
 
@@ -351,7 +360,12 @@ def gestion_participantes():
 
 # Actualizar participantes
 @app.route('/participante/actualizar', methods=['POST'])
+@login_required
 def actualizar_participante():
+    """Actualizar nickname de un participante. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+
     participante_id = request.form.get('id')
     nuevo_nickname = request.form.get('nickname')
 
@@ -374,7 +388,11 @@ def actualizar_participante():
 
 # Actualizar personajes de participantes
 @app.route('/participantes/actualizar_personajes', methods=['POST'])
+@login_required
 def actualizar_personajes_participantes():
+    """Actualiza los personajes de todos los participantes. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
 
     # Obtener todos los participantes
     try:
@@ -390,7 +408,12 @@ def actualizar_personajes_participantes():
 
 # Retirar/Reactivar participante
 @app.route('/participante/eliminar/<int:id>', methods=['POST'])
+@login_required
 def eliminar_participante(id):
+    """Alternar estado activo/inactivo de un participante. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    
     participante = Participante.query.get_or_404(id)
 
     # Alternar estado activo/inactivo
@@ -406,12 +429,11 @@ def eliminar_participante(id):
 
 # Eliminar participante permanentemente
 @app.route('/participante/borrar/<int:id>', methods=['POST'])
+@login_required
 def borrar_participante(id):
-    codigo = request.form.get('codigo_secreto', '')
-
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
-        return redirect(url_for('gestion_participantes'))
+    """Eliminar permanentemente un participante si no tiene relaciones. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
 
     participante = Participante.query.get_or_404(id)
 
@@ -456,7 +478,11 @@ def borrar_participante(id):
 
 # Index Personajes
 @app.route('/personajes', methods=['GET', 'POST'])
+@login_required
 def gestion_personajes():
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         # Crear nuevo personaje
         nombre = request.form['nombre']
@@ -477,7 +503,12 @@ def gestion_personajes():
 
 # Editar nombre Personaje
 @app.route('/personaje/editar/<int:id>', methods=['POST'])
+@login_required
 def editar_personaje(id):
+    """Editar nombre de un personaje. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    
     personaje = Personaje.query.get_or_404(id)
     nuevo_nombre = request.form.get('nombre')
 
@@ -498,13 +529,13 @@ def editar_personaje(id):
 
 # Borrar Personaje
 @app.route('/personaje/eliminar/<int:id>', methods=['POST'])
+@login_required
 def eliminar_personaje(id):
-    personaje = Personaje.query.get_or_404(id)
-    codigo = request.form.get('codigo_secreto', '')
+    """Eliminar un personaje si no está en uso. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
 
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
-        return redirect(url_for('gestion_personajes'))
+    personaje = Personaje.query.get_or_404(id)
 
     # Verificar si el personaje está asociado a algún participante
     if personaje.participantes:
@@ -544,9 +575,13 @@ def eliminar_personaje(id):
 
 # Index Evento
 @app.route('/eventos', methods=['GET', 'POST'])
+@login_required
 def gestion_eventos():
     if request.method == 'POST':
-        from datetime import datetime
+        
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+            return redirect(url_for('gestion_eventos'))
+
         fecha = datetime.strptime(request.form['fecha'], '%Y-%m-%d').date()
         nuevo_evento = Evento(fecha=fecha)
         db.session.add(nuevo_evento)
@@ -559,10 +594,14 @@ def gestion_eventos():
 
 # Evento - Asistencia
 @app.route('/evento/asistencia/<int:evento_id>', methods=['GET', 'POST'])
+@login_required
 def registrar_asistencia(evento_id):
     evento = Evento.query.get_or_404(evento_id)
 
     if request.method == 'POST':
+
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+            return redirect(url_for('registrar_asistencia', evento_id=evento_id))
 
         # Comprobar si el evento esta activo
         if not evento.activo:
@@ -631,11 +670,9 @@ def registrar_asistencia(evento_id):
 
 # Activar/Desactivar Evento
 @app.route('/evento/activar_desactivar/<int:id>', methods=['POST'])
+@login_required
 def activar_desactivar_evento(id):
-    codigo = request.form.get('codigo_secreto', '')
-
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
         return redirect(url_for('gestion_eventos'))
 
     evento = Evento.query.get_or_404(id)
@@ -653,11 +690,9 @@ def activar_desactivar_evento(id):
 
 # Eliminar Evento
 @app.route('/evento/eliminar/<int:id>', methods=['POST'])
+@login_required
 def eliminar_evento(id):
-    codigo = request.form.get('codigo_secreto', '')
-
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
         return redirect(url_for('gestion_eventos'))
 
     evento = Evento.query.get_or_404(id)
@@ -707,10 +742,14 @@ def eliminar_evento(id):
 
 # Index Rondas
 @app.route('/evento/rondas/<int:evento_id>', methods=['GET', 'POST'])
+@login_required
 def gestion_rondas(evento_id):
     evento = Evento.query.get_or_404(evento_id)
 
     if request.method == 'POST':
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+            return redirect(url_for('gestion_rondas', evento_id=evento_id))
+
         # Comprobar si el evento esta activo
         if not evento.activo:
             flash('Evento bloqueado, No se pueden crear nuevas rondas', 'danger')
@@ -795,8 +834,11 @@ def gestion_rondas(evento_id):
 
 # Renombrar Ronda
 @app.route('/evento/ronda/editar/<int:id>', methods=['POST'])
+@login_required
 def editar_ronda(id):
     ronda = Ronda.query.get_or_404(id)
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+        return redirect(url_for('gestion_rondas', evento_id=ronda.evento_id))
 
     # Comprobar si el evento esta activo
     evento = Evento.query.get(ronda.evento_id)
@@ -813,22 +855,18 @@ def editar_ronda(id):
 
 # Eliminar Ronda
 @app.route('/evento/ronda/eliminar/<int:id>', methods=['POST'])
+@login_required
 def eliminar_ronda(id):
-    codigo = request.form.get('codigo_secreto', '')
-
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
-        ronda = Ronda.query.get_or_404(id)
+    ronda = Ronda.query.get_or_404(id)
+    
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
         return redirect(url_for('gestion_rondas', evento_id=ronda.evento_id))
 
-    ronda = Ronda.query.get_or_404(id)
-    evento_id = ronda.evento_id
-
     # Comprobar si el evento esta activo
-    evento = Evento.query.get(evento_id)
+    evento = Evento.query.get(ronda.evento_id)
     if not evento.activo:
         flash('Evento bloqueado, No se pueden eliminar las rondas', 'danger')
-        return redirect(url_for('gestion_rondas', evento_id=evento_id))
+        return redirect(url_for('gestion_rondas', evento_id=evento.id))
 
     # Eliminar todos los matches de la ronda
     Match.query.filter_by(ronda_id=id).delete()
@@ -836,7 +874,7 @@ def eliminar_ronda(id):
     db.session.delete(ronda)
     db.session.commit()
     flash('Ronda eliminada!', 'success')
-    return redirect(url_for('gestion_rondas', evento_id=evento_id))
+    return redirect(url_for('gestion_rondas', evento_id=evento.id))
 
 # =============================================================================
 # Matchups
@@ -844,14 +882,14 @@ def eliminar_ronda(id):
 
 # Index Matchups
 @app.route('/evento/ronda/matchups/<int:ronda_id>', methods=['GET', 'POST'])
+@login_required
 def gestion_matchups(ronda_id):
     ronda = Ronda.query.get_or_404(ronda_id)
     todos_personajes = Personaje.query.order_by(Personaje.nombre).all()
 
-    # Verificar si es una prueba
-    test_mode = request.form.get('test_mode') == 'true'
-
     if request.method == 'POST':
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_TODOS_AUTENTICADOS):
+            return redirect(url_for('gestion_matchups', ronda_id=ronda_id))
 
         # Comprobar si el evento esta activo
         evento = Evento.query.get(ronda.evento_id)
@@ -859,8 +897,6 @@ def gestion_matchups(ronda_id):
             flash('Evento bloqueado, No se pueden modificar los matchups', 'danger')
             return redirect(url_for('gestion_matchups', ronda_id=ronda.id))
 
-        if test_mode:
-            app.logger.info("=== MODO PRUEBA ACTIVADO ===")
         # Imprimir todos los datos del formulario para depuración
         app.logger.info("=== DATOS DEL FORMULARIO RECIBIDOS ===")
         for key, value in request.form.items():
@@ -990,10 +1026,14 @@ def gestion_matchups(ronda_id):
 
 # Se planea usar https://github.com/Drarig29/brackets-manager.js
 @app.route('/evento/torneos/<int:evento_id>', methods=['GET', 'POST'])
+@login_required
 def gestion_torneos(evento_id):
     evento = Evento.query.get_or_404(evento_id)
 
     if request.method == 'POST':
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+            return redirect(url_for('gestion_torneos', evento_id=evento_id))
+
         if not evento.activo:
             flash('Evento bloqueado, no se pueden crear torneos', 'danger')
             return redirect(url_for('gestion_torneos', evento_id=evento_id))
@@ -1114,17 +1154,19 @@ def gestion_torneos(evento_id):
     return render_template('torneos.html', evento=evento, torneos=torneos, standings=standings_dict)
 
 @app.route('/evento/torneo/editar', methods=['POST'])
+@login_required
 def editar_torneo():
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+        return redirect(url_for('gestion_torneos'))
     return redirect(url_for('gestion_torneos'))
 
 @app.route('/evento/torneo/eliminar/<int:torneo_id>', methods=['POST'])
+@login_required
 def eliminar_torneo(torneo_id):
-    codigo = request.form.get('codigo_secreto', '')
     torneo = Torneo.query.get_or_404(torneo_id)
     stage_id = torneo.torneo_id_externo
     
-    if codigo != Codigo_Secreto:
-        flash('Código secreto incorrecto', 'danger')
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
         return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
     if not torneo.evento.activo:
@@ -1149,11 +1191,15 @@ def eliminar_torneo(torneo_id):
     return redirect(url_for('gestion_torneos', evento_id=torneo.evento_id))
 
 @app.route('/evento/torneo/brackets/<int:torneo_id>', methods=['GET', 'POST'])
+@login_required
 def gestion_brackets(torneo_id):
     torneo = Torneo.query.get_or_404(torneo_id)
     stage_id = torneo.torneo_id_externo
 
     if request.method == 'POST':
+        if not utils.verificar_permiso_tipo(*utils.TIPOS_TODOS_AUTENTICADOS):
+            return redirect(url_for('gestion_brackets', torneo_id=torneo_id))
+
         if not torneo.evento.activo:
             flash('El evento está bloqueado, no se puede modificar el torneo', 'danger')
             return redirect(url_for('gestion_brackets', torneo_id=torneo.id))

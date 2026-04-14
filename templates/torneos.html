@@ -17,10 +17,12 @@
     <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">⬅️ Volver a Eventos</a>
 </div>
 
+{% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
 <!-- Botón para abrir modal de creación -->
 <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#crearTorneoModal">
     ➕ Crear Torneo
 </button>
+{% endif %}
 
 <!-- Lista de torneos -->
 {% if torneos %}
@@ -41,9 +43,11 @@
                 <td>
                     <a href="{{ url_for('gestion_brackets', torneo_id=t.id) }}" class="btn btn-sm btn-primary">Brackets</a>
                     <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#resultadosModal" data-torneo-id="{{ t.id }}" data-torneo-nombre="{{ t.nombre }}">Resultados 👑</button>
+                    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
                     <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#eliminarTorneoModal" data-id="{{ t.id }}" data-nombre="{{ t.nombre }}">
                         ❌
                     </button>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -265,11 +269,7 @@
             <form method="POST" action="" id="formEliminarTorneo">
                 <div class="modal-body">
                     <p>¿Estás seguro de que deseas eliminar el torneo <strong id="torneoNombreEliminar"></strong>?</p>
-                    <p>Ingrese el código secreto para continuar:</p>
                     <input type="hidden" name="id" id="torneoIdEliminar">
-                    <div class="mb-3">
-                        <input type="password" class="form-control" name="codigo_secreto" required>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

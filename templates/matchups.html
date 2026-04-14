@@ -206,6 +206,11 @@
     // Variable para almacenar instancias de Tom Select
     const tomSelectInstances = {};
 
+    // Determinar si el usuario actual puede editar
+    const isAuthenticated = {{ current_user.is_authenticated|tojson }};
+    const userTipo = {{ current_user.tipo.nombre|tojson if current_user.is_authenticated else 'null' }};
+    const puedeEditar = isAuthenticated && userTipo && ['Admin', 'Líder de liga', 'Participante'].includes(userTipo);
+
     // Función para mostrar/ocultar el ganador del match
     function actualizarGanadorMatch(match) {
         const ganadorContainer = document.getElementById('ganadorMatchContainer');
@@ -432,6 +437,49 @@
             // Reiniciar checkboxes
             document.getElementById('mismoPersonajeJ1').checked = false;
             document.getElementById('mismoPersonajeJ2').checked = false;
+
+            // Aplicar deshabilitación según permisos
+            if (!puedeEditar) {
+                // Deshabilitar todos los selects de personajes (TomSelect)
+                for (let id in tomSelectInstances) {
+                    if (tomSelectInstances[id]) {
+                        tomSelectInstances[id].disable();
+                    }
+                }
+                // Deshabilitar radio buttons
+                document.querySelectorAll('.ganador-radio').forEach(radio => {
+                    radio.disabled = true;
+                });
+                // Deshabilitar checkboxes de mismo personaje
+                document.getElementById('mismoPersonajeJ1').disabled = true;
+                document.getElementById('mismoPersonajeJ2').disabled = true;
+                // Deshabilitar botón Refrescar
+                document.getElementById('btnRefrescar').disabled = true;
+                // Deshabilitar campo de videos
+                document.getElementById('videosInput').disabled = true;
+                // Deshabilitar botón de guardar
+                document.querySelector('button[type="submit"]').disabled = true;
+            } else {
+                // Habilitar selects (TomSelect)
+                for (let id in tomSelectInstances) {
+                    if (tomSelectInstances[id]) {
+                        tomSelectInstances[id].enable();
+                    }
+                }
+                // Habilitar radio buttons
+                document.querySelectorAll('.ganador-radio').forEach(radio => {
+                    radio.disabled = false;
+                });
+                // Habilitar checkboxes
+                document.getElementById('mismoPersonajeJ1').disabled = false;
+                document.getElementById('mismoPersonajeJ2').disabled = false;
+                // Habilitar botón Refrescar
+                document.getElementById('btnRefrescar').disabled = false;
+                // Habilitar campo de videos
+                document.getElementById('videosInput').disabled = false;
+                // Habilitar botón de guardar
+                document.querySelector('button[type="submit"]').disabled = false;
+            }
         } else {
             // Si no hay match, ocultar el contenedor del ganador
             document.getElementById('ganadorMatchContainer').style.display = 'none';
@@ -617,6 +665,29 @@
 
         // Inicializar event listeners
         inicializarEventListeners();
+
+        // Aplicar deshabilitación global si no tiene permisos
+        if (!puedeEditar) {
+            // Deshabilitar TomSelects
+            for (let id in tomSelectInstances) {
+                if (tomSelectInstances[id]) {
+                    tomSelectInstances[id].disable();
+                }
+            }
+            // Deshabilitar radio buttons
+            document.querySelectorAll('.ganador-radio').forEach(radio => {
+                radio.disabled = true;
+            });
+            // Deshabilitar checkboxes de mismo personaje
+            document.getElementById('mismoPersonajeJ1').disabled = true;
+            document.getElementById('mismoPersonajeJ2').disabled = true;
+            // Deshabilitar botón Refrescar
+            document.getElementById('btnRefrescar').disabled = true;
+            // Deshabilitar campo de videos
+            document.getElementById('videosInput').disabled = true;
+            // Deshabilitar botón de guardar
+            document.querySelector('button[type="submit"]').disabled = true;
+        }
 
         // Actualizar radios si ya hay jugadores seleccionados
         const jugador1 = document.getElementById('jugador1').value;

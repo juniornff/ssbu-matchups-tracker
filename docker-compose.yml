@@ -21,9 +21,11 @@ services:
     volumes:
       - ./instance:/app/instance
     environment:
+      - COMUNITY_NAME=${COMUNITY_NAME}
       - API_TORNEOS_URL=http://tournament-server:3000
       - SECRET_KEY=${SECRET_KEY}
-      - SECRET_CODE=${SECRET_CODE}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     depends_on:
       - tournament-server
     networks:

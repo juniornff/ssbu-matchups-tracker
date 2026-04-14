@@ -4,7 +4,8 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 ## Features
 
-- Participant management (registration, deactivation, reactivation).
+- User management and restrictions by user type
+- Participant management (Users can be participants in matchups and tournaments or simply spectators).
 - Complete SSBU character catalog. (images used come from [spriters-resource](https://www.spriters-resource.com/nintendo_switch/supersmashbrosultimate/))
 - Event creation and attendance registration.
 - Automatic round generation with Round Robin system.
@@ -29,7 +30,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 ## Future Plans
 
 - **MySQL Database Integration:** Enable the option to use MySQL as a database alternative to SQLite.
-- **User Authentication & Profiles:** Implement a secure user login system (e.g., OAuth or email/password) to enable personalized experiences, role‑based access control, and the ability for players to manage their registrations and match histories.
+- **External User Authentication Methods:** Implement a secure user login methods (e.g., OAuth) to ensure an easier and safer way to access the application.
 
 ## Prerequisites
 
@@ -38,7 +39,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - Node.js (for the API server)
 - (Optional) Docker
 
-## Usage with Docker
+## Usage with Docker (Recommended)
 
 1. **Prepare the project directory**
 
@@ -76,9 +77,11 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         volumes:
         - ./instance:/app/instance
         environment:
+        - COMUNITY_NAME=${COMUNITY_NAME}
         - API_TORNEOS_URL=http://tournament-server:3000
         - SECRET_KEY=${SECRET_KEY}
-        - SECRET_CODE=${SECRET_CODE}
+        - ADMIN_EMAIL=${ADMIN_EMAIL}
+        - ADMIN_PASSWORD=${ADMIN_PASSWORD}
         depends_on:
         - tournament-server
         networks:
@@ -91,17 +94,14 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 3. **Configure environment variables (optional but recommended)**
 
-    The application uses two important secret values:
+    The application uses this enviroment varibles:
+    - `COMUNITY_NAME`: Define the name of the community/league that is displayed on the home page.
+    - `API_TORNEOS_URL`: Link to the tournament management API server; the default is the server deployed in Docker Compose. Modify if deployed elsewhere.
     - `SECRET_KEY`: Used by Flask for session security and cryptographic signing.
-    - `SECRET_CODE`: A custom secret that protects sensitive actions (e.g., deleting events, participants, etc.).
+    - `ADMIN_EMAIL` and `ADMIN_PASSWORD`: Define the email and password for the initial admin user for the application.
 
     You can define these variables in a `.env` file placed in the same directory as your `docker-compose.yml`.  
-    Create a file named `.env` with the following content (replace the values with your own strong secrets):
-
-    ```bash
-    SECRET_KEY=your_flask_secret_key_here
-    SECRET_CODE=your_custom_secret_code_here
-    ```
+    Create a file named `.env` with the following content (replace the values with your own):
 
     If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.
     For production, it is strongly recommended to set them explicitly to maintain session persistence and avoid unexpected changes.
@@ -196,18 +196,11 @@ If you prefer to run the application directly on your system without Docker, fol
 
 5. **Configure environment variables**
 
-    The application requires the following environment variables:
-
-    - `SECRET_KEY`: Used by Flask for session security and cryptographic signing.
-    - `SECRET_CODE`: A custom secret that protects sensitive actions (e.g., deleting events, participants, etc.).
-    - `API_TORNEOS_URL`: URL of the tournament manager API (default is `http://localhost:3000` if not set).
-
-    You can set these variables in your terminal before running the application, or use a `.env` file with a tool like `python-dotenv` (the application does not load `.env` automatically in development mode; you need to export them manually or use a package like `python-dotenv` in your own setup).
+    You can set these variables in your terminal before running the application, or use a `.env` file with a tool like `python-dotenv`.
 
     **On Linux / Mac:**
     ```bash
     export SECRET_KEY="your_flask_secret_key"
-    export SECRET_CODE="your_custom_secret_code"
     export API_TORNEOS_URL="http://localhost:3000"  # adjust if your API runs elsewhere
     ```
 
@@ -215,11 +208,9 @@ If you prefer to run the application directly on your system without Docker, fol
     ```bash
     # Command Prompt
     set SECRET_KEY=your_flask_secret_key
-    set SECRET_CODE=your_custom_secret_code
     set API_TORNEOS_URL=http://localhost:3000
     # PowerShell
     $env:SECRET_KEY="your_flask_secret_key"
-    $env:SECRET_CODE="your_custom_secret_code"
     $env:API_TORNEOS_URL="http://localhost:3000"
     ```
     If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.

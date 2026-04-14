@@ -14,12 +14,8 @@
       </div>
       <div class="modal-body">
         <p id="estadoEventoModalTexto">¿Estás seguro de que deseas cambiar el estado de este evento?</p>
-        <p>Ingrese el código secreto para continuar:</p>
         <form id="formCambiarEstadoEvento" method="POST" action="">
           <input type="hidden" name="id" id="eventoIdEstado">
-          <div class="mb-3">
-            <input type="password" class="form-control" name="codigo_secreto" required>
-          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -40,11 +36,7 @@
       </div>
       <div class="modal-body">
         <p>¿Estás seguro de que deseas eliminar este evento? Se eliminarán todas las asistencias, rondas y partidas asociadas.</p>
-        <p>Ingrese el código secreto para continuar:</p>
         <form id="formEliminarEvento" method="POST" action="">
-          <div class="mb-3">
-            <input type="password" class="form-control" name="codigo_secreto" required>
-          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -56,6 +48,7 @@
 </div>
 
 <div class="row">
+    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
     <div class="col-md-6">
         <h3>Crear Nuevo Evento</h3>
         <form method="POST">
@@ -67,8 +60,13 @@
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver</a>
         </form>
     </div>
+    {% endif %}
 
+    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
     <div class="col-md-6">
+    {% else %}
+    <div class="col-md-12">
+    {% endif %}
         <h3>Eventos Registrados</h3>
         <div class="table-responsive">
             <table class="table table-hover">
@@ -89,6 +87,7 @@
                             <a href="{{ url_for('gestion_rondas', evento_id=evento.id) }}" class="btn btn-sm btn-success">Rondas</a>
                             <!-- Botón Torneos -->
                             <a href= "{{ url_for('gestion_torneos', evento_id=evento.id) }}" class="btn btn-sm btn-warning">Torneos 👑</a>
+                            {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
                             <!-- Botón Activar/Desactivar -->
                             <button type="button" class="btn btn-sm {% if evento.activo %}btn-outline-secondary{% else %}btn-outline-success{% endif %}"
                                     data-bs-toggle="modal" data-bs-target="#confirmarEstadoEventoModal"
@@ -103,12 +102,16 @@
                                     data-id="{{ evento.id }}">
                                 ❌
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% if not current_user.is_authenticated or not current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

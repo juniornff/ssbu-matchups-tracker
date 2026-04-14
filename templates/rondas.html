@@ -78,11 +78,7 @@
       </div>
       <div class="modal-body">
         <p>¿Estás seguro de que quieres eliminar esta ronda? Se eliminarán todos los matches asociados.</p>
-        <p>Ingrese el código secreto para continuar:</p>
         <form id="formEliminarRonda" method="POST" action="">
-          <div class="mb-3">
-            <input type="password" class="form-control" name="codigo_secreto" required>
-          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -94,7 +90,8 @@
 </div>
 
 <div class="row">
-    <div class="col-md-6">
+  {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}  
+  <div class="col-md-6">
         <h3>Crear Nueva Ronda</h3>
         <form method="POST">
             <div class="mb-3">
@@ -105,8 +102,13 @@
             <a href="{{ url_for('gestion_eventos') }}" class="btn btn-secondary">Volver</a>
         </form>
     </div>
+    {% endif %}
 
+    {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
     <div class="col-md-6">
+    {% else %}
+    <div class="col-md-12">
+    {% endif %}
         <h3>Rondas Registradas</h3>
         {% if evento.rondas %}
         <div class="table-responsive">
@@ -141,7 +143,7 @@
                         </td>
                         <td>
                             <a href="{{ url_for('gestion_matchups', ronda_id=ronda.id) }}" class="btn btn-sm btn-primary">Matchups</a>
-
+                            {% if current_user.is_authenticated and current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
                             <!-- Botón Editar -->
                             <button type="button" class="btn btn-sm btn-outline-secondary"
                                     data-bs-toggle="modal" data-bs-target="#editarRondaModal"
@@ -155,6 +157,7 @@
                                     data-id="{{ ronda.id }}">
                                 ❌
                             </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -165,6 +168,9 @@
         <div class="alert alert-info">
             No hay rondas registradas para este evento.
         </div>
+        {% endif %}
+        {% if not current_user.is_authenticated or not current_user.tipo.nombre in ('Admin', 'Líder de liga') %}
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver</a>
         {% endif %}
     </div>
 </div>
