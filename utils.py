@@ -293,6 +293,52 @@ def actualizar_personajes_participantes_logic(app, api_url):
 
     db.session.commit()
 
+def crear_participante_para_usuario(usuario, nickname):
+    """
+    Crea un nuevo participante con el nickname dado y lo asocia al usuario.
+    Cambia el tipo del usuario a 'Participante' si era 'Espectador'.
+    Retorna (bool, mensaje).
+    """
+    if usuario.participante:
+        return False, 'El usuario ya tiene un participante asociado.'
+    if not nickname or not nickname.strip():
+        return False, 'El nickname no puede estar vacío.'
+    nickname = nickname.strip()
+    # Verificar unicidad
+    if Participante.query.filter_by(nickname=nickname).first():
+        return False, 'Este nickname ya está en uso por otro participante.'
+    # Crear participante
+    participante = Participante(nickname=nickname)
+    db.session.add(participante)
+    db.session.flush()  # para obtener el id
+    usuario.participante_id = participante.id
+    # Si el usuario es 'Espectador', cambiar a 'Participante'
+    if usuario.tipo and usuario.tipo.nombre == 'Espectador':
+        tipo_participante = TipoUsuario.query.filter_by(nombre='Participante').first()
+        if tipo_participante:
+            usuario.tipo_id = tipo_participante.id
+    db.session.commit()
+    return True, 'Nickname creado y asociado correctamente.'
+
+def actualizar_nickname_participante(usuario, nuevo_nickname):
+    """
+    Actualiza el nickname del participante asociado al usuario.
+    Verifica que el nickname no esté ya en uso por otro participante.
+    Retorna (bool, mensaje).
+    """
+    if not usuario.participante:
+        return False, 'No tienes un perfil de participante asociado a tu cuenta.'
+    # Verificar unicidad (excluyendo al propio participante)
+    otro = Participante.query.filter(
+        Participante.nickname == nuevo_nickname,
+        Participante.id != usuario.participante_id
+    ).first()
+    if otro:
+        return False, 'Este nickname ya está en uso por otro participante.'
+    usuario.participante.nickname = nuevo_nickname
+    db.session.commit()
+    return True, 'Nickname actualizado correctamente.'
+
 def api_request(method, url, **kwargs):
     """
     Realiza una petición HTTP a la API externa y maneja errores comunes.

@@ -73,9 +73,9 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                 <li>
-                                    <span class="dropdown-item-text text-muted small">
-                                        {{ current_user.email }}
-                                    </span>
+                                    <a class="dropdown-item" href="{{ url_for('configuracion_usuario') }}">
+                                        ⚙️ Configuración
+                                    </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>

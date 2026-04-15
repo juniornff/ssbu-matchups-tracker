@@ -275,6 +275,88 @@ def logout():
     return redirect(url_for('login'))
 
 # =============================================================================
+# Configuración de Usuario
+# =============================================================================
+
+@app.route('/configuracion', methods=['GET', 'POST'])
+@login_required
+def configuracion_usuario():
+    """
+    Permite al usuario modificar su email, contraseña y nickname (si tiene participante).
+    """
+    usuario = current_user
+    error = None
+    success = None
+
+    if request.method == 'POST':
+        # Determinar qué acción se está realizando (por separado para evitar conflictos)
+        if 'cambiar_email' in request.form:
+            nuevo_email = request.form.get('email', '').strip().lower()
+            # Validación básica de formato
+            if not nuevo_email or '@' not in nuevo_email or '.' not in nuevo_email:
+                error = 'El email no tiene un formato válido.'
+            elif nuevo_email == usuario.email:
+                error = 'El nuevo email es igual al actual.'
+            elif Usuario.query.filter_by(email=nuevo_email).first():
+                error = 'Este email ya está registrado por otro usuario.'
+            else:
+                usuario.email = nuevo_email
+                db.session.commit()
+                success = 'Email actualizado correctamente.'
+
+        elif 'cambiar_password' in request.form:
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+
+            if not bcrypt.check_password_hash(usuario.password_hash, current_password):
+                error = 'La contraseña actual es incorrecta.'
+            elif len(new_password) < 8:
+                error = 'La nueva contraseña debe tener al menos 8 caracteres.'
+            elif new_password == current_password:
+                error = 'La nueva contraseña no puede ser igual a la actual.'
+            elif new_password != confirm_password:
+                error = 'Las nuevas contraseñas no coinciden.'
+            else:
+                usuario.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+                db.session.commit()
+                success = 'Contraseña actualizada correctamente.'
+
+        elif 'crear_nickname' in request.form:
+            nuevo_nickname = request.form.get('nickname', '').strip()
+            if not nuevo_nickname:
+                error = 'El nickname no puede estar vacío.'
+            else:
+                ok, msg = utils.crear_participante_para_usuario(usuario, nuevo_nickname)
+                if ok:
+                    success = msg
+                else:
+                    error = msg
+        
+        elif 'cambiar_nickname' in request.form:
+            nuevo_nickname = request.form.get('nickname', '').strip()
+            if not nuevo_nickname:
+                error = 'El nickname no puede estar vacío.'
+            elif usuario.participante and usuario.participante.nickname == nuevo_nickname:
+                error = 'El nuevo nickname es igual al actual.'
+            else:
+                # Usar función auxiliar que verifica unicidad y actualiza
+                ok, msg = utils.actualizar_nickname_participante(usuario, nuevo_nickname)
+                if ok:
+                    success = msg
+                else:
+                    error = msg
+
+        # Si hubo éxito, redirigir para evitar reenvío de formulario
+        if success:
+            flash(success, 'success')
+            return redirect(url_for('configuracion_usuario'))
+        elif error:
+            flash(error, 'danger')
+
+    return render_template('configuracion.html', usuario=usuario)
+
+# =============================================================================
 # Index
 # =============================================================================
 
