@@ -28,12 +28,6 @@
             <div class="collapse navbar-collapse navbar-dark bg-dark" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('gestion_participantes') }}">Participantes</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('gestion_personajes') }}">Personajes</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('gestion_eventos') }}">Eventos</a>
                     </li>
                     {% if ronda_actual_id %}
@@ -78,6 +72,10 @@
                                     </a>
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
+                                {% if current_user.is_authenticated and current_user.tipo.nombre == 'Admin' %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin_panel') }}">⚙️ Administración</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                {% endif %}
                                 <li>
                                     <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
                                         🚪 Cerrar Sesión

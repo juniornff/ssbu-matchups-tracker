@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Gestión de Tipos de Usuario</h2>
+        <a href="{{ url_for('admin_panel') }}" class="btn btn-secondary">Volver al Panel</a>
+    </div>
+    <hr>
+
+    <!-- Formulario para crear nuevo tipo -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Crear nuevo tipo</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin_tipo_crear') }}" class="row g-3">
+                <div class="col-auto">
+                    <label for="nombre" class="visually-hidden">Nombre del tipo</label>
+                    <input type="text" class="form-control" id="nombre" name="nombre" placeholder="Ej. Moderador" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Crear tipo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Listado de tipos existentes -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">Tipos registrados</h5>
+        </div>
+        <div class="card-body">
+            {% if tipos %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tipo in tipos %}
+                        <tr>
+                            <td>{{ tipo.id }}</td>
+                            <td>{{ tipo.nombre }}</td>
+                            <td>
+                                <!-- Botón Editar (abre modal) -->
+                                <button type="button" class="btn btn-sm btn-outline-primary me-2"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editarTipoModal"
+                                        data-id="{{ tipo.id }}"
+                                        data-nombre="{{ tipo.nombre }}">
+                                    Editar
+                                </button>
+                                <!-- Botón Eliminar (abre modal) -->
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#eliminarTipoModal"
+                                        data-id="{{ tipo.id }}"
+                                        data-nombre="{{ tipo.nombre }}">
+                                    Eliminar
+                                </button>
+                             </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No hay tipos de usuario registrados.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar tipo -->
+<div class="modal fade" id="editarTipoModal" tabindex="-1" aria-labelledby="editarTipoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editarTipoModalLabel">Editar tipo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="" id="formEditarTipo">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_nombre" class="form-label">Nuevo nombre</label>
+                        <input type="text" class="form-control" id="edit_nombre" name="nombre" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para eliminar tipo -->
+<div class="modal fade" id="eliminarTipoModal" tabindex="-1" aria-labelledby="eliminarTipoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eliminarTipoModalLabel">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar el tipo <strong id="tipoNombreEliminar"></strong>?</p>
+                <p class="text-danger">Esta acción no se puede deshacer. Solo se eliminará si no hay usuarios con este tipo.</p>
+            </div>
+            <div class="modal-footer">
+                <form method="POST" action="" id="formEliminarTipo">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Manejar el modal de edición: cargar el nombre actual y setear la acción
+    const editarModal = document.getElementById('editarTipoModal');
+    editarModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const nombre = button.getAttribute('data-nombre');
+        const form = document.getElementById('formEditarTipo');
+        form.action = "{{ url_for('admin_tipo_editar', id=0) }}".replace('0', id);
+        const inputNombre = document.getElementById('edit_nombre');
+        inputNombre.value = nombre;
+    });
+
+    // Manejar el modal de eliminación: setear la acción y mostrar el nombre
+    const eliminarModal = document.getElementById('eliminarTipoModal');
+    eliminarModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const nombre = button.getAttribute('data-nombre');
+        const form = document.getElementById('formEliminarTipo');
+        form.action = "{{ url_for('admin_tipo_eliminar', id=0) }}".replace('0', id);
+        document.getElementById('tipoNombreEliminar').textContent = nombre;
+    });
+</script>
+{% endblock %}

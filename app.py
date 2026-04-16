@@ -357,6 +357,291 @@ def configuracion_usuario():
     return render_template('configuracion.html', usuario=usuario)
 
 # =============================================================================
+# Panel de Administración
+# =============================================================================
+
+@app.route('/admin')
+@login_required
+def admin_panel():
+    """Panel principal de administración. Solo accesible para usuarios tipo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        flash('No tienes permisos para acceder al panel de administración.', 'danger')
+        return redirect(url_for('index'))
+    return render_template('admin.html')
+
+# =============================================================================
+# Administración de Tipos de Usuario
+# =============================================================================
+
+@app.route('/admin/tipos')
+@login_required
+def admin_tipos():
+    """Listado de tipos de usuario. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    tipos = TipoUsuario.query.order_by(TipoUsuario.id).all()
+    return render_template('admin_tipos.html', tipos=tipos)
+
+
+@app.route('/admin/tipos/crear', methods=['POST'])
+@login_required
+def admin_tipo_crear():
+    """Crear un nuevo tipo de usuario. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    nombre = request.form.get('nombre', '').strip()
+    if not nombre:
+        flash('El nombre del tipo no puede estar vacío.', 'danger')
+        return redirect(url_for('admin_tipos'))
+    if TipoUsuario.query.filter_by(nombre=nombre).first():
+        flash('Ya existe un tipo con ese nombre.', 'danger')
+        return redirect(url_for('admin_tipos'))
+    nuevo = TipoUsuario(nombre=nombre)
+    db.session.add(nuevo)
+    db.session.commit()
+    flash(f'Tipo "{nombre}" creado correctamente.', 'success')
+    return redirect(url_for('admin_tipos'))
+
+
+@app.route('/admin/tipos/editar/<int:id>', methods=['POST'])
+@login_required
+def admin_tipo_editar(id):
+    """Editar un tipo de usuario. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    tipo = TipoUsuario.query.get_or_404(id)
+    nuevo_nombre = request.form.get('nombre', '').strip()
+    if not nuevo_nombre:
+        flash('El nombre no puede estar vacío.', 'danger')
+        return redirect(url_for('admin_tipos'))
+    if nuevo_nombre == tipo.nombre:
+        flash('El nombre es el mismo que el actual.', 'warning')
+        return redirect(url_for('admin_tipos'))
+    otro = TipoUsuario.query.filter(TipoUsuario.nombre == nuevo_nombre, TipoUsuario.id != id).first()
+    if otro:
+        flash('Ya existe otro tipo con ese nombre.', 'danger')
+        return redirect(url_for('admin_tipos'))
+    tipo.nombre = nuevo_nombre
+    db.session.commit()
+    flash(f'Tipo actualizado a "{nuevo_nombre}".', 'success')
+    return redirect(url_for('admin_tipos'))
+
+
+@app.route('/admin/tipos/eliminar/<int:id>', methods=['POST'])
+@login_required
+def admin_tipo_eliminar(id):
+    """Eliminar un tipo de usuario. Solo Admin. No se puede eliminar si hay usuarios con ese tipo."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    tipo = TipoUsuario.query.get_or_404(id)
+    # Verificar si hay usuarios asociados
+    usuarios_con_tipo = Usuario.query.filter_by(tipo_id=tipo.id).count()
+    if usuarios_con_tipo > 0:
+        flash(f'No se puede eliminar el tipo "{tipo.nombre}" porque hay {usuarios_con_tipo} usuario(s) que lo tienen asignado.', 'danger')
+        return redirect(url_for('admin_tipos'))
+    db.session.delete(tipo)
+    db.session.commit()
+    flash(f'Tipo "{tipo.nombre}" eliminado correctamente.', 'success')
+    return redirect(url_for('admin_tipos'))
+
+# =============================================================================
+# Administración de Usuarios
+# =============================================================================
+
+@app.route('/admin/usuarios')
+@login_required
+def admin_usuarios():
+    """Listado de usuarios. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    usuarios = Usuario.query.order_by(Usuario.id).all()
+    return render_template('admin_usuarios.html', usuarios=usuarios)
+
+
+@app.route('/admin/usuarios/toggle/<int:id>', methods=['POST'])
+@login_required
+def admin_usuario_toggle(id):
+    """Activar/desactivar un usuario. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    usuario = Usuario.query.get_or_404(id)
+    # No permitir desactivar al propio admin
+    if usuario.id == current_user.id:
+        flash('No puedes desactivar tu propia cuenta.', 'danger')
+        return redirect(url_for('admin_usuarios'))
+    
+    # Si se intenta desactivar un Admin, verificar que no sea el único activo
+    if usuario.tipo.nombre == 'Admin' and usuario.activo:
+        # Contar otros admins activos (excluyendo este usuario)
+        otros_admins_activos = Usuario.query.filter(
+            Usuario.tipo.has(nombre='Admin'),
+            Usuario.id != usuario.id,
+            Usuario.activo == True
+        ).count()
+        if otros_admins_activos == 0:
+            flash('No se puede desactivar al único administrador activo del sistema.', 'danger')
+            return redirect(url_for('admin_usuarios'))
+    
+    usuario.activo = not usuario.activo
+    db.session.commit()
+    estado = "activado" if usuario.activo else "desactivado"
+    flash(f'Usuario {usuario.email} {estado} correctamente.', 'success')
+    return redirect(url_for('admin_usuarios'))
+
+
+@app.route('/admin/usuarios/eliminar/<int:id>', methods=['POST'])
+@login_required
+def admin_usuario_eliminar(id):
+    """Eliminar un usuario. Solo Admin. No se puede eliminar si tiene participante asociado o es el único Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+    usuario = Usuario.query.get_or_404(id)
+    # No permitir eliminar al propio admin
+    if usuario.id == current_user.id:
+        flash('No puedes eliminar tu propia cuenta.', 'danger')
+        return redirect(url_for('admin_usuarios'))
+    if usuario.participante_id is not None:
+        flash(f'No se puede eliminar el usuario {usuario.email} porque tiene un participante asociado ({usuario.participante.nickname}).', 'danger')
+        return redirect(url_for('admin_usuarios'))
+    
+    # Si es Admin, verificar que no sea el único Admin registrado
+    if usuario.tipo.nombre == 'Admin':
+        otros_admins = Usuario.query.filter(
+            Usuario.tipo.has(nombre='Admin'),
+            Usuario.id != usuario.id
+        ).count()
+        if otros_admins == 0:
+            flash('No se puede eliminar al único administrador del sistema.', 'danger')
+            return redirect(url_for('admin_usuarios'))
+    
+    db.session.delete(usuario)
+    db.session.commit()
+    flash(f'Usuario {usuario.email} eliminado correctamente.', 'success')
+    return redirect(url_for('admin_usuarios'))
+
+# =============================================================================
+# Administración de Usuarios - Crear y Editar
+# =============================================================================
+
+@app.route('/admin/usuarios/nuevo', methods=['GET', 'POST'])
+@login_required
+def admin_usuario_nuevo():
+    """Formulario para crear un nuevo usuario. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        return _guardar_usuario(request.form, crear=True)
+    # GET: mostrar formulario vacío
+    participantes = Participante.query.order_by(Participante.nickname).all()
+    tipos = TipoUsuario.query.order_by(TipoUsuario.id).all()
+    return render_template('admin_usuario_form.html', 
+                           modo='crear', 
+                           participantes=participantes, 
+                           tipos=tipos)
+
+
+@app.route('/admin/usuarios/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_usuario_editar(id):
+    """Formulario para editar un usuario existente. Solo Admin."""
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
+        return redirect(url_for('index'))
+
+    usuario = Usuario.query.get_or_404(id)
+    if request.method == 'POST':
+        return _guardar_usuario(request.form, crear=False, usuario=usuario)
+
+    # GET: mostrar formulario con datos del usuario
+    participantes = Participante.query.order_by(Participante.nickname).all()
+    tipos = TipoUsuario.query.order_by(TipoUsuario.id).all()
+    return render_template('admin_usuario_form.html',
+                           modo='editar',
+                           usuario=usuario,
+                           participantes=participantes,
+                           tipos=tipos)
+
+
+def _guardar_usuario(form, crear, usuario=None):
+    """
+    Función auxiliar para guardar (crear o editar) un usuario.
+    Valida los campos y gestiona la asociación con participante.
+    """
+    email = form.get('email', '').strip().lower()
+    tipo_id = form.get('tipo_id')
+    password = form.get('password', '')
+    # Participante: puede ser seleccionado de existentes o nuevo
+    participante_id = form.get('participante_id')
+    nuevo_nickname = form.get('nuevo_nickname', '').strip()
+
+    # Validaciones comunes
+    if not email:
+        flash('El email es obligatorio.', 'danger')
+        return redirect(request.referrer or url_for('admin_usuarios'))
+    if '@' not in email or '.' not in email:
+        flash('El email no tiene un formato válido.', 'danger')
+        return redirect(request.referrer or url_for('admin_usuarios'))
+    if not tipo_id or not TipoUsuario.query.get(tipo_id):
+        flash('Debes seleccionar un tipo de usuario válido.', 'danger')
+        return redirect(request.referrer or url_for('admin_usuarios'))
+
+    # Validar unicidad del email (excepto si se está editando el mismo usuario)
+    otro = Usuario.query.filter(Usuario.email == email)
+    if not crear and usuario:
+        otro = otro.filter(Usuario.id != usuario.id)
+    if otro.first():
+        flash('Ya existe un usuario con ese email.', 'danger')
+        return redirect(request.referrer or url_for('admin_usuarios'))
+
+    # Manejo del participante
+    participante = None
+    if participante_id:
+        participante = Participante.query.get(participante_id)
+        if not participante:
+            flash('El participante seleccionado no existe.', 'danger')
+            return redirect(request.referrer or url_for('admin_usuarios'))
+    elif nuevo_nickname:
+        # Verificar que el nickname no exista ya
+        if Participante.query.filter_by(nickname=nuevo_nickname).first():
+            flash(f'El nickname "{nuevo_nickname}" ya está en uso.', 'danger')
+            return redirect(request.referrer or url_for('admin_usuarios'))
+        participante = Participante(nickname=nuevo_nickname)
+        db.session.add(participante)
+        db.session.flush()  # para obtener el id
+
+    if crear:
+        # Validar contraseña obligatoria
+        if not password or len(password) < 8:
+            flash('La contraseña debe tener al menos 8 caracteres.', 'danger')
+            return redirect(request.referrer or url_for('admin_usuarios'))
+        password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        nuevo_usuario = Usuario(
+            email=email,
+            password_hash=password_hash,
+            tipo_id=int(tipo_id),
+            activo=True,
+            email_verificado=True,  # SMTP aún no implementado
+            participante_id=participante.id if participante else None
+        )
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+        flash(f'Usuario {email} creado correctamente.', 'success')
+    else:
+        # Edición: actualizar campos
+        if password:
+            if len(password) < 8:
+                flash('La nueva contraseña debe tener al menos 8 caracteres.', 'danger')
+                return redirect(request.referrer or url_for('admin_usuarios'))
+            usuario.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        usuario.email = email
+        usuario.tipo_id = int(tipo_id)
+        usuario.participante_id = participante.id if participante else None
+        db.session.commit()
+        flash(f'Usuario {email} actualizado correctamente.', 'success')
+
+    return redirect(url_for('admin_usuarios'))
+
+# =============================================================================
 # Index
 # =============================================================================
 
@@ -411,7 +696,7 @@ def configurar_ronda_actual():
 # =============================================================================
 
 # Index Participantes
-@app.route('/participantes', methods=['GET', 'POST'])
+@app.route('/admin/participantes', methods=['GET', 'POST'])
 @login_required
 def gestion_participantes():
 
@@ -441,7 +726,7 @@ def gestion_participantes():
                           INTERVALO_ACTUALIZACION_HORAS=INTERVALO_ACTUALIZACION_HORAS)
 
 # Actualizar participantes
-@app.route('/participante/actualizar', methods=['POST'])
+@app.route('/admin/participante/actualizar', methods=['POST'])
 @login_required
 def actualizar_participante():
     """Actualizar nickname de un participante. Solo Admin."""
@@ -469,7 +754,7 @@ def actualizar_participante():
     return redirect(url_for('gestion_participantes'))
 
 # Actualizar personajes de participantes
-@app.route('/participantes/actualizar_personajes', methods=['POST'])
+@app.route('/admin/participantes/actualizar_personajes', methods=['POST'])
 @login_required
 def actualizar_personajes_participantes():
     """Actualiza los personajes de todos los participantes. Solo Admin."""
@@ -489,9 +774,9 @@ def actualizar_personajes_participantes():
     return redirect(url_for('gestion_participantes'))
 
 # Retirar/Reactivar participante
-@app.route('/participante/eliminar/<int:id>', methods=['POST'])
+@app.route('/admin/participante/toggle/<int:id>', methods=['POST'])
 @login_required
-def eliminar_participante(id):
+def toggle_participante(id):
     """Alternar estado activo/inactivo de un participante. Solo Admin."""
     if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
         return redirect(url_for('index'))
@@ -510,7 +795,7 @@ def eliminar_participante(id):
     return redirect(url_for('gestion_participantes'))
 
 # Eliminar participante permanentemente
-@app.route('/participante/borrar/<int:id>', methods=['POST'])
+@app.route('/admin/participante/borrar/<int:id>', methods=['POST'])
 @login_required
 def borrar_participante(id):
     """Eliminar permanentemente un participante si no tiene relaciones. Solo Admin."""
@@ -559,7 +844,7 @@ def borrar_participante(id):
 # =============================================================================
 
 # Index Personajes
-@app.route('/personajes', methods=['GET', 'POST'])
+@app.route('/admin/personajes', methods=['GET', 'POST'])
 @login_required
 def gestion_personajes():
     if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
@@ -584,7 +869,7 @@ def gestion_personajes():
     return render_template('personajes.html', personajes=personajes)
 
 # Editar nombre Personaje
-@app.route('/personaje/editar/<int:id>', methods=['POST'])
+@app.route('/admin/personaje/editar/<int:id>', methods=['POST'])
 @login_required
 def editar_personaje(id):
     """Editar nombre de un personaje. Solo Admin."""
@@ -610,7 +895,7 @@ def editar_personaje(id):
     return redirect(url_for('gestion_personajes'))
 
 # Borrar Personaje
-@app.route('/personaje/eliminar/<int:id>', methods=['POST'])
+@app.route('/admin/personaje/eliminar/<int:id>', methods=['POST'])
 @login_required
 def eliminar_personaje(id):
     """Eliminar un personaje si no está en uso. Solo Admin."""

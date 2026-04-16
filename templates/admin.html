@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Panel de Administración</h2>
+    <p class="text-muted">Gestiona los recursos del sistema</p>
+    <hr>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Usuarios</h5>
+                </div>
+                <div class="card-body">
+                    <p>Gestiona las cuentas de usuario: crear, editar, activar/desactivar, cambiar tipo, eliminar.</p>
+                    <a href="{{ url_for('admin_usuarios') }}" class="btn btn-primary">Gestionar Usuarios</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Tipos de Usuario</h5>
+                </div>
+                <div class="card-body">
+                    <p>Administra los roles disponibles (Admin, Líder de liga, Participante, Espectador).</p>
+                    <a href="{{ url_for('admin_tipos') }}" class="btn btn-success">Gestionar Tipos</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Participantes</h5>
+                </div>
+                <div class="card-body">
+                    <p>Gestiona los perfiles de jugadores (nickname, personajes, estado activo).</p>
+                    <a href="{{ url_for('gestion_participantes') }}" class="btn btn-info">Gestionar Participantes</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Personajes</h5>
+                </div>
+                <div class="card-body">
+                    <p>Administra el catálogo de personajes (añadir, editar, eliminar).</p>
+                    <a href="{{ url_for('gestion_personajes') }}" class="btn btn-warning">Gestionar Personajes</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver al inicio</a>
+    </div>
+</div>
+{% endblock %}

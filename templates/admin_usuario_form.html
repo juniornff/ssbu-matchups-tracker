@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>{% if modo == 'crear' %}Crear Usuario{% else %}Editar Usuario{% endif %}</h2>
+        <a href="{{ url_for('admin_usuarios') }}" class="btn btn-secondary">Volver a Usuarios</a>
+    </div>
+    <hr>
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">{% if modo == 'crear' %}Nuevo usuario{% else %}Editar datos{% endif %}</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{% if modo == 'crear' %}{{ url_for('admin_usuario_nuevo') }}{% else %}{{ url_for('admin_usuario_editar', id=usuario.id) }}{% endif %}">
+                <!-- Email -->
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email *</label>
+                    <input type="email" class="form-control" id="email" name="email"
+                           value="{{ usuario.email if usuario else '' }}" required>
+                </div>
+
+                <!-- Contraseña -->
+                <div class="mb-3">
+                    <label for="password" class="form-label">
+                        {% if modo == 'crear' %}Contraseña *{% else %}Nueva contraseña (dejar vacío para no cambiar){% endif %}
+                    </label>
+                    <input type="password" class="form-control" id="password" name="password"
+                           {% if modo == 'crear' %}required{% endif %}>
+                    <div class="form-text">Mínimo 8 caracteres.</div>
+                </div>
+
+                <!-- Tipo de usuario -->
+                <div class="mb-3">
+                    <label for="tipo_id" class="form-label">Tipo de usuario *</label>
+                    <select class="form-select" id="tipo_id" name="tipo_id" required>
+                        <option value="">Selecciona un tipo</option>
+                        {% for tipo in tipos %}
+                        <option value="{{ tipo.id }}" {% if usuario and usuario.tipo_id == tipo.id %}selected{% endif %}>
+                            {{ tipo.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Participante: seleccionar existente o crear nuevo -->
+                <div class="mb-3">
+                    <label class="form-label">Participante</label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="participante_id" class="form-label">Seleccionar existente</label>
+                            <select class="form-select" id="participante_id" name="participante_id">
+                                <option value="">-- Ninguno --</option>
+                                {% for p in participantes %}
+                                <option value="{{ p.id }}" {% if usuario and usuario.participante_id == p.id %}selected{% endif %}>
+                                    {{ p.nickname }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nuevo_nickname" class="form-label">O crear nuevo con nickname</label>
+                            <input type="text" class="form-control" id="nuevo_nickname" name="nuevo_nickname"
+                                   placeholder="Ej. NuevoJugador">
+                            <div class="form-text">Si se proporciona, se creará un nuevo participante (ignora la selección anterior).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        {% if modo == 'crear' %}Crear usuario{% else %}Guardar cambios{% endif %}
+                    </button>
+                    <a href="{{ url_for('admin_usuarios') }}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
