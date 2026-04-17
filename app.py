@@ -4,9 +4,6 @@ from models import db, Participante, Personaje, Evento, Asistencia, Ronda, Torne
 import utils
 from utils import bcrypt
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-import atexit
 from datetime import datetime, timedelta
 import json
 
@@ -30,8 +27,6 @@ os.makedirs(app.instance_path, exist_ok=True)
 COMUNITY_NAME = os.environ.get('COMUNITY_NAME') or 'Jugadores de la liga'
 # Variable que indica que Ronda usar para el boton en Index
 ronda_actual_id = None
-# Variable ajustable para el intervalo (en horas)
-INTERVALO_ACTUALIZACION_HORAS = 24
 # Variable para el URL del API de Torneos
 API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://tournament-server:3000'
 
@@ -65,40 +60,12 @@ def load_user(user_id):
 # Ejecutar la inicialización al importar
 utils.init_db(app)
 
-# =============================================================================
-# Configuración del Scheduler (tareas programadas)
-# =============================================================================
-
-scheduler = BackgroundScheduler()
-scheduler.start()
-
 with app.app_context():
     app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
     if utils.check_api_connection(API_TORNEOS_URL):
         app.logger.info("Conexión con API de torneos establecida correctamente.")
     else:
         app.logger.warning("No se pudo conectar con la API de torneos. Algunas funciones pueden no estar disponibles.")
-
-# Función para la tarea programada
-def actualizar_personajes_automatico():
-    with app.app_context():
-        try:
-            app.logger.info(f"{datetime.now()}: Ejecutando actualización automática de personajes...")
-            utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
-            app.logger.info(f"{datetime.now()}: Actualización automática de personajes completada")
-        except Exception as e:
-            app.logger.info(f"{datetime.now()}: Error en actualización automática: {str(e)}")
-
-# Programar la tarea
-scheduler.add_job(
-    func=actualizar_personajes_automatico,
-    trigger=IntervalTrigger(hours=INTERVALO_ACTUALIZACION_HORAS),
-    id='actualizar_personajes_job',
-    name='Actualizar personajes de participantes cada 24 horas',
-    replace_existing=True)
-
-# Apagar el scheduler cuando la aplicación se cierre
-atexit.register(lambda: scheduler.shutdown())
 
 # =============================================================================
 # Filtros y Context Processors
@@ -658,8 +625,7 @@ def gestion_participantes():
     personajes = Personaje.query.all()
     return render_template('participantes.html',
                           participantes=participantes,
-                          personajes=personajes,
-                          INTERVALO_ACTUALIZACION_HORAS=INTERVALO_ACTUALIZACION_HORAS)
+                          personajes=personajes)
 
 # Actualizar participantes
 @app.route('/admin/participante/actualizar', methods=['POST'])
