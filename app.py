@@ -949,6 +949,9 @@ def registrar_asistencia(evento_id):
         for ronda in evento.rondas:
             utils.refrescar_matches_ronda(ronda)  # Se ejecuta por cada ronda
 
+        # Actualizar personajes de participantes afectados
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
+
         return redirect(url_for('registrar_asistencia', evento_id=evento_id))
 
     participantes = Participante.query.all()
@@ -1019,6 +1022,8 @@ def eliminar_evento(id):
         # Eliminar el evento
         db.session.delete(evento)
         db.session.commit()
+        # Actualizar personajes de participantes afectados
+        utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
         flash('Evento eliminado con éxito', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1163,6 +1168,8 @@ def eliminar_ronda(id):
     # Eliminar la Ronda
     db.session.delete(ronda)
     db.session.commit()
+    # Actualizar personajes de participantes afectados
+    utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
     flash('Ronda eliminada!', 'success')
     return redirect(url_for('gestion_rondas', evento_id=evento.id))
 
@@ -1304,8 +1311,8 @@ def gestion_matchups(ronda_id):
         match.videos = videos
 
         db.session.commit()
-        flash('Resultados guardados!', 'success')
         utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
+        flash('Resultados guardados!', 'success')
         return redirect(url_for('gestion_matchups', ronda_id=ronda_id))
 
     return render_template('matchups.html', ronda=ronda, todos_personajes=todos_personajes)
@@ -1591,6 +1598,8 @@ def gestion_brackets(torneo_id):
                         break
 
             if not any_error:
+                # Actualizar personajes de participantes afectados
+                utils.actualizar_personajes_participantes_logic(app, API_TORNEOS_URL)
                 flash('Juegos actualizados correctamente', 'success')
         else:
             flash('Tipo de actualización desconocido', 'danger')
