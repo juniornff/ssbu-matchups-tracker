@@ -113,16 +113,25 @@
                 <h5 class="modal-title" id="eliminarUserModalLabel">Confirmar eliminación</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que deseas eliminar al usuario <strong id="eliminarUserEmail"></strong>?</p>
-                <p class="text-danger">Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="modal-footer">
-                <form method="POST" action="" id="formEliminarUser">
+            <form method="POST" action="" id="formEliminarUser">
+                <div class="modal-body">
+                    <p>¿Estás seguro de que deseas eliminar al usuario <strong id="eliminarUserEmail"></strong>?</p>
+                    <p class="text-danger">Esta acción no se puede deshacer.</p>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" name="delete_participant" id="delete_participant_checkbox">
+                        <label class="form-check-label" for="delete_participant_checkbox">
+                            También eliminar el participante asociado (si lo tiene)
+                        </label>
+                        <div class="form-text text-warning">
+                            Solo se eliminará si no tiene personajes, asistencias, partidas ni resultados en torneos.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-danger">Eliminar</button>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>

@@ -495,28 +495,14 @@ def admin_usuario_eliminar(id):
     """Eliminar un usuario. Solo Admin. No se puede eliminar si tiene participante asociado o es el único Admin."""
     if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
         return redirect(url_for('index'))
-    usuario = Usuario.query.get_or_404(id)
-    # No permitir eliminar al propio admin
-    if usuario.id == current_user.id:
-        flash('No puedes eliminar tu propia cuenta.', 'danger')
-        return redirect(url_for('admin_usuarios'))
-    if usuario.participante_id is not None:
-        flash(f'No se puede eliminar el usuario {usuario.email} porque tiene un participante asociado ({usuario.participante.nickname}).', 'danger')
-        return redirect(url_for('admin_usuarios'))
     
-    # Si es Admin, verificar que no sea el único Admin registrado
-    if usuario.tipo.nombre == 'Admin':
-        otros_admins = Usuario.query.filter(
-            Usuario.tipo.has(nombre='Admin'),
-            Usuario.id != usuario.id
-        ).count()
-        if otros_admins == 0:
-            flash('No se puede eliminar al único administrador del sistema.', 'danger')
-            return redirect(url_for('admin_usuarios'))
-    
-    db.session.delete(usuario)
-    db.session.commit()
-    flash(f'Usuario {usuario.email} eliminado correctamente.', 'success')
+    delete_participant = 'delete_participant' in request.form   # Checkbox
+    ok, msg = utils.eliminar_usuario(
+        usuario_id=id,
+        delete_participant=delete_participant,
+        current_user_id=current_user.id
+    )
+    flash(msg, 'success' if ok else 'danger')
     return redirect(url_for('admin_usuarios'))
 
 # =============================================================================
@@ -802,41 +788,8 @@ def borrar_participante(id):
     if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
         return redirect(url_for('index'))
 
-    participante = Participante.query.get_or_404(id)
-
-    # Verificar si tiene relaciones antes de eliminar
-    tiene_personajes = len(participante.personajes) > 0
-    tiene_asistencias = Asistencia.query.filter_by(participante_id=id).first() is not None
-    tiene_matches = Match.query.filter(
-        (Match.jugador1_id == id) | (Match.jugador2_id == id)
-    ).first() is not None
-
-    # Si tiene alguna relación, no permitir eliminación
-    if tiene_personajes or tiene_asistencias or tiene_matches:
-        mensaje_error = "No se puede eliminar el participante porque tiene "
-        razones = []
-
-        if tiene_personajes:
-            razones.append("personajes asociados")
-        if tiene_asistencias:
-            razones.append("asistencias registradas")
-        if tiene_matches:
-            razones.append("partidas jugadas")
-
-        mensaje_error += ", ".join(razones)
-        flash(mensaje_error, 'danger')
-        return redirect(url_for('gestion_participantes'))
-
-    # Si no tiene relaciones, proceder con la eliminación
-    try:
-        # Eliminar el participante
-        db.session.delete(participante)
-        db.session.commit()
-        flash('Participante eliminado permanentemente', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al eliminar participante: {str(e)}', 'danger')
-
+    ok, msg = utils.eliminar_participante(id)
+    flash(msg, 'success' if ok else 'danger')
     return redirect(url_for('gestion_participantes'))
 
 # =============================================================================
@@ -902,38 +855,8 @@ def eliminar_personaje(id):
     if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN):
         return redirect(url_for('index'))
 
-    personaje = Personaje.query.get_or_404(id)
-
-    # Verificar si el personaje está asociado a algún participante
-    if personaje.participantes:
-        flash('No se puede eliminar: el personaje está asociado a participantes', 'danger')
-        return redirect(url_for('gestion_personajes'))
-
-    # Verificar si el personaje está presente en algún match
-    # Revisar todos los campos de personaje en la tabla Match (rondas 1-5 para ambos jugadores)
-    campos_personaje = [
-        'personaje1r1_id', 'personaje2r1_id',
-        'personaje1r2_id', 'personaje2r2_id',
-        'personaje1r3_id', 'personaje2r3_id',
-        'personaje1r4_id', 'personaje2r4_id',
-        'personaje1r5_id', 'personaje2r5_id'
-    ]
-
-    for campo in campos_personaje:
-        # Verificar si existe algún match donde este campo tenga el ID del personaje
-        match_con_personaje = Match.query.filter(getattr(Match, campo) == id).first()
-        if match_con_personaje:
-            flash('No se puede eliminar: el personaje está registrado en partidas existentes', 'danger')
-            return redirect(url_for('gestion_personajes'))
-
-    try:
-        db.session.delete(personaje)
-        db.session.commit()
-        flash('Personaje eliminado con éxito', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al eliminar personaje: {str(e)}', 'danger')
-
+    ok, msg = utils.eliminar_personaje(id, API_TORNEOS_URL)
+    flash(msg, 'success' if ok else 'danger')
     return redirect(url_for('gestion_personajes'))
 
 # =============================================================================

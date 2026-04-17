@@ -488,20 +488,30 @@ def eliminar_personaje(personaje_id, api_url):
     db.session.commit()
     return True, f"Personaje '{personaje.nombre}' eliminado correctamente."
 
-def eliminar_participante(participante_id, api_url):
+def eliminar_participante(participante_id):
     """
-    Elimina un participante de la base de datos y actualiza todas las referencias:
-    - Desvincula el participante de su usuario (si existe) y cambia el tipo a 'Espectador'.
-    - Pone a NULL las referencias en matches de rondas (jugadores y ganadores).
-    - Actualiza los torneos vía API para poner a NULL los oponentes.
-    - Elimina el participante de la API (DELETE /participants/:id).
-    - Finalmente elimina el participante de la BD.
+    Elimina un participante de la base de datos SOLO si no tiene relaciones:
+    - Sin personajes asociados
+    - Sin asistencias registradas
+    - Sin partidas jugadas (como jugador1 o jugador2)
+    - Sin resultados en torneos (TorneoResultado)
+    Si tiene alguna relación, se rechaza la eliminación.
     """
     participante = Participante.query.get(participante_id)
     if not participante:
         return False, "El participante no existe."
 
-    # 1. Desvincular del usuario
+    # Verificar relaciones
+    if participante.personajes:
+        return False, f"No se puede eliminar el participante '{participante.nickname}' porque tiene personajes asociados."
+    if Asistencia.query.filter_by(participante_id=participante_id).first():
+        return False, f"No se puede eliminar el participante '{participante.nickname}' porque tiene asistencias registradas en eventos."
+    if Match.query.filter((Match.jugador1_id == participante_id) | (Match.jugador2_id == participante_id)).first():
+        return False, f"No se puede eliminar el participante '{participante.nickname}' porque tiene partidas jugadas."
+    if TorneoResultado.query.filter_by(participante_id=participante_id).first():
+        return False, f"No se puede eliminar el participante '{participante.nickname}' porque tiene resultados en torneos."
+
+    # Desvincular del usuario
     usuario = Usuario.query.filter_by(participante_id=participante_id).first()
     if usuario:
         usuario.participante_id = None
@@ -512,87 +522,7 @@ def eliminar_participante(participante_id, api_url):
                 usuario.tipo_id = tipo_espectador.id
         db.session.flush()
 
-    # 2. Actualizar matches de rondas
-    # Jugadores
-    matches_j1 = Match.query.filter_by(jugador1_id=participante_id).all()
-    for match in matches_j1:
-        match.jugador1_id = None
-    matches_j2 = Match.query.filter_by(jugador2_id=participante_id).all()
-    for match in matches_j2:
-        match.jugador2_id = None
-
-    # Ganadores de match y rondas
-    campos_ganador = ['ganador_match', 'ganador_r1', 'ganador_r2', 'ganador_r3', 'ganador_r4', 'ganador_r5']
-    for campo in campos_ganador:
-        matches = Match.query.filter(getattr(Match, campo) == participante_id).all()
-        for match in matches:
-            setattr(match, campo, None)
-    db.session.flush()
-
-    # 3. Actualizar torneos vía API
-    # Buscar todos los torneos donde este participante haya participado
-    # Primero, obtener los torneos a través de TorneoResultado (si existe)
-    resultados = TorneoResultado.query.filter_by(participante_id=participante_id).all()
-    torneos_ids = set(res.torneo_id for res in resultados)
-    torneos = Torneo.query.filter(Torneo.id.in_(torneos_ids)).all() if torneos_ids else []
-
-    for torneo in torneos:
-        stage_id = torneo.torneo_id_externo
-        stage_data = api_request('GET', f"{api_url}/stages/{stage_id}")
-        if 'error' in stage_data or not stage_data:
-            continue
-
-        # Buscar el participant_id en la API (por nombre)
-        participant_id_api = None
-        for part in stage_data.get('participant', []):
-            if part and part.get('name') == participante.nickname:
-                participant_id_api = part.get('id')
-                break
-        if participant_id_api is None:
-            continue
-
-        # Para cada match sin hijos
-        for match in stage_data.get('match', []):
-            if match is None or match.get('child_count', 0) != 0:
-                continue
-            match_id = match['id']
-            updated = False
-            payload = {}
-            if match.get('opponent1') and match['opponent1'].get('id') == participant_id_api:
-                payload['opponent1'] = None
-                updated = True
-            if match.get('opponent2') and match['opponent2'].get('id') == participant_id_api:
-                payload['opponent2'] = None
-                updated = True
-            if updated:
-                resp = api_request('PUT', f"{api_url}/matches/{match_id}/manual", json=payload)
-                if 'error' in resp:
-                    current_app.logger.error(f"Error actualizando match {match_id}: {resp['error']}")
-
-        # Para cada match_game
-        for game in stage_data.get('match_game', []):
-            if game is None:
-                continue
-            game_id = game['id']
-            updated = False
-            payload = {}
-            if game.get('opponent1') and game['opponent1'].get('id') == participant_id_api:
-                payload['opponent1'] = None
-                updated = True
-            if game.get('opponent2') and game['opponent2'].get('id') == participant_id_api:
-                payload['opponent2'] = None
-                updated = True
-            if updated:
-                resp = api_request('PUT', f"{api_url}/match-games/{game_id}/manual", json=payload)
-                if 'error' in resp:
-                    current_app.logger.error(f"Error actualizando match_game {game_id}: {resp['error']}")
-
-        # Eliminar el participante de la API (DELETE /participants/:id)
-        resp = api_request('DELETE', f"{api_url}/participants/{participant_id_api}")
-        if 'error' in resp:
-            current_app.logger.error(f"Error eliminando participante de API: {resp['error']}")
-
-    # 4. Eliminar el participante de la BD
+    # Eliminar el participante
     db.session.delete(participante)
     db.session.commit()
     return True, f"Participante '{participante.nickname}' eliminado correctamente."
@@ -625,7 +555,7 @@ def eliminar_usuario(usuario_id, delete_participant=False, current_user_id=None)
 
     # Eliminar participante asociado si se solicita
     if delete_participant and usuario.participante:
-        ok, msg = eliminar_participante(usuario.participante.id, current_app.config.get('API_TORNEOS_URL'))
+        ok, msg = eliminar_participante(usuario.participante.id)
         if not ok:
             return False, f"Error eliminando participante: {msg}"
 
