@@ -25,6 +25,16 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=int(os.environ.get('S
 # Asegurar que el directorio de instancias exista
 os.makedirs(app.instance_path, exist_ok=True)
 
+# Variables
+# Nombre comunidad o liga
+COMUNITY_NAME = os.environ.get('COMUNITY_NAME') or 'Jugadores de la liga'
+# Variable que indica que Ronda usar para el boton en Index
+ronda_actual_id = None
+# Variable ajustable para el intervalo (en horas)
+INTERVALO_ACTUALIZACION_HORAS = 24
+# Variable para el URL del API de Torneos
+API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://tournament-server:3000'
+
 # =============================================================================
 # Inicialización de extensiones
 # =============================================================================
@@ -61,16 +71,6 @@ utils.init_db(app)
 
 scheduler = BackgroundScheduler()
 scheduler.start()
-
-# Variables
-# Nombre comunidad o liga
-COMUNITY_NAME = os.environ.get('COMUNITY_NAME') or 'Jugadores de la liga'
-# Variable que indica que Ronda usar para el boton en Index
-ronda_actual_id = None
-# Variable ajustable para el intervalo (en horas)
-INTERVALO_ACTUALIZACION_HORAS = 24
-# Variable para el URL del API de Torneos
-API_TORNEOS_URL = os.environ.get('API_TORNEOS_URL') or 'http://tournament-server:3000'
 
 with app.app_context():
     app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
@@ -628,57 +628,7 @@ def _guardar_usuario(form, crear, usuario=None):
     return redirect(url_for('admin_usuarios'))
 
 # =============================================================================
-# Index
-# =============================================================================
-
-@app.route('/')
-def index():
-    global ronda_actual_id
-
-    # Si no hay ronda actual configurada, obtener la última ronda creada
-    if ronda_actual_id is None:
-        ultima_ronda = Ronda.query.order_by(Ronda.id.desc()).first()
-        # ultima_ronda = Ronda.query.join(Evento).filter(Evento.activo == True).order_by(Ronda.id.desc()).first()
-        if ultima_ronda:
-            ronda_actual_id = ultima_ronda.id
-
-    # Obtener todos los eventos con sus rondas para el modal
-    eventos = Evento.query.order_by(Evento.fecha.desc()).all()
-    # eventos = Evento.query.filter(Evento.activo == True).order_by(Evento.fecha.desc()).all()
-
-    return render_template('index.html',
-                         ronda_actual_id=ronda_actual_id,
-                         eventos=eventos,
-                         comunity_name=COMUNITY_NAME)
-
-# Configurar Ronda Actual en Index
-@app.route('/configurar_ronda_actual', methods=['POST'])
-def configurar_ronda_actual():
-    """
-    Configura la ronda actual para acceso rápido desde el Index.
-
-    No requiere autenticación obligatoria, pero solo usuarios con tipo
-    Admin o Líder de liga pueden realizar la acción.
-    """
-    global ronda_actual_id
-
-    # Verificar permiso sin requerir login obligatorio en la ruta
-    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
-        return redirect(url_for('index'))
-
-    # Verificar que la ronda existe
-    ronda_id = request.form.get('ronda_id')
-    ronda = Ronda.query.get(ronda_id)
-    if not ronda:
-        flash('Ronda no encontrada', 'danger')
-        return redirect(url_for('index'))
-
-    ronda_actual_id = ronda_id
-    flash('Ronda actual configurada correctamente!', 'success')
-    return redirect(url_for('index'))
-
-# =============================================================================
-# Participantes
+# Administración de participantes
 # =============================================================================
 
 # Index Participantes
@@ -793,7 +743,7 @@ def borrar_participante(id):
     return redirect(url_for('gestion_participantes'))
 
 # =============================================================================
-# Personajes
+# Administración de Personajes
 # =============================================================================
 
 # Index Personajes
@@ -858,6 +808,56 @@ def eliminar_personaje(id):
     ok, msg = utils.eliminar_personaje(id, API_TORNEOS_URL)
     flash(msg, 'success' if ok else 'danger')
     return redirect(url_for('gestion_personajes'))
+
+# =============================================================================
+# Index
+# =============================================================================
+
+@app.route('/')
+def index():
+    global ronda_actual_id
+
+    # Si no hay ronda actual configurada, obtener la última ronda creada
+    if ronda_actual_id is None:
+        ultima_ronda = Ronda.query.order_by(Ronda.id.desc()).first()
+        # ultima_ronda = Ronda.query.join(Evento).filter(Evento.activo == True).order_by(Ronda.id.desc()).first()
+        if ultima_ronda:
+            ronda_actual_id = ultima_ronda.id
+
+    # Obtener todos los eventos con sus rondas para el modal
+    eventos = Evento.query.order_by(Evento.fecha.desc()).all()
+    # eventos = Evento.query.filter(Evento.activo == True).order_by(Evento.fecha.desc()).all()
+
+    return render_template('index.html',
+                         ronda_actual_id=ronda_actual_id,
+                         eventos=eventos,
+                         comunity_name=COMUNITY_NAME)
+
+# Configurar Ronda Actual en Index
+@app.route('/configurar_ronda_actual', methods=['POST'])
+def configurar_ronda_actual():
+    """
+    Configura la ronda actual para acceso rápido desde el Index.
+
+    No requiere autenticación obligatoria, pero solo usuarios con tipo
+    Admin o Líder de liga pueden realizar la acción.
+    """
+    global ronda_actual_id
+
+    # Verificar permiso sin requerir login obligatorio en la ruta
+    if not utils.verificar_permiso_tipo(*utils.TIPOS_ADMIN_LIDER):
+        return redirect(url_for('index'))
+
+    # Verificar que la ronda existe
+    ronda_id = request.form.get('ronda_id')
+    ronda = Ronda.query.get(ronda_id)
+    if not ronda:
+        flash('Ronda no encontrada', 'danger')
+        return redirect(url_for('index'))
+
+    ronda_actual_id = ronda_id
+    flash('Ronda actual configurada correctamente!', 'success')
+    return redirect(url_for('index'))
 
 # =============================================================================
 # Eventos
