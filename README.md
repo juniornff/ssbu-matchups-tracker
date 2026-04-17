@@ -64,7 +64,9 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         volumes:
         - ./data:/app/data
         environment:
+        - API_KEY=${API_KEY}
         - DATA_FILE=data/db.json
+        - VERBOSE=false
         networks:
         - smash-net
 
@@ -79,6 +81,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         environment:
         - COMUNITY_NAME=${COMUNITY_NAME}
         - API_TORNEOS_URL=http://tournament-server:3000
+        - API_KEY=${API_KEY}
         - SECRET_KEY=${SECRET_KEY}
         - ADMIN_EMAIL=${ADMIN_EMAIL}
         - ADMIN_PASSWORD=${ADMIN_PASSWORD}
@@ -97,11 +100,13 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
     The application uses this enviroment varibles:
     - `COMUNITY_NAME`: Define the name of the community/league that is displayed on the home page.
     - `API_TORNEOS_URL`: Link to the tournament management API server; the default is the server deployed in Docker Compose. Modify if deployed elsewhere.
+    - `API_KEY`: You can specify an API key to secure the connection to the API server and prevent unwanted third-party connections; this can be omitted if desired.
     - `SECRET_KEY`: Used by Flask for session security and cryptographic signing.
     - `ADMIN_EMAIL` and `ADMIN_PASSWORD`: Define the email and password for the initial admin user for the application.
 
+    The use of environment variables for the API server are described in its corresponding [repository](https://github.com/juniornff/brackets-manager-server#:~:text=Configuration%20and%20environment%20variables%20(optional%20but%20recommended)).
+
     You can define these variables in a `.env` file placed in the same directory as your `docker-compose.yml`.  
-    Create a file named `.env` with the following content (replace the values with your own):
 
     If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.
     For production, it is strongly recommended to set them explicitly to maintain session persistence and avoid unexpected changes.
@@ -230,4 +235,4 @@ If you prefer to run the application directly on your system without Docker, fol
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](https://raw.githubusercontent.com/juniornff/ssbu-matchups-tracker/refs/heads/main/LICENSE) file for more details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.

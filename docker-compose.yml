@@ -8,7 +8,9 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - DATA_FILE=data/db.json
+      - API_KEY=${API_KEY}
+      - DATA_FILE=db.json
+      - VERBOSE=false
     networks:
       - smash-net
 
@@ -23,6 +25,7 @@ services:
     environment:
       - COMUNITY_NAME=${COMUNITY_NAME}
       - API_TORNEOS_URL=http://tournament-server:3000
+      - API_KEY=${API_KEY}
       - SECRET_KEY=${SECRET_KEY}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}

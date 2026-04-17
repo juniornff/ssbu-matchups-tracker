@@ -343,7 +343,18 @@ def api_request(method, url, **kwargs):
     """
     Realiza una petición HTTP a la API externa y maneja errores comunes.
     Retorna el JSON de la respuesta si es exitosa, o un dict con 'error' en caso contrario.
+    
+    Soporta autenticación mediante API key vía variable de entorno API_KEY.
+    Si API_KEY está definida, se añade al header 'x-api-key'.
     """
+    api_key = os.environ.get('API_KEY')
+    
+    headers = kwargs.pop('headers', {}) if 'headers' in kwargs else {}
+    if api_key:
+        headers['x-api-key'] = api_key
+    
+    kwargs['headers'] = headers
+    
     try:
         response = requests.request(method, url, timeout=5, **kwargs)
         response.raise_for_status()
@@ -351,9 +362,16 @@ def api_request(method, url, **kwargs):
     except requests.exceptions.HTTPError as e:
         try:
             error_data = e.response.json()
-            return {'error': error_data.get('error', f'HTTP {e.response.status_code}')}
+            error_msg = error_data.get('error', f'HTTP {e.response.status_code}')
+            # Detectar error específico de API key faltante o inválida
+            if e.response.status_code == 401 and 'API Key' in error_msg:
+                current_app.logger.warning(f"Error de autenticación con API: {error_msg}. Verifica la variable de entorno API_KEY.")
+            return {'error': error_msg}
         except:
-            return {'error': f'HTTP {e.response.status_code}'}
+            error_msg = f'HTTP {e.response.status_code}'
+            if e.response.status_code == 401:
+                current_app.logger.warning("Error 401 sin cuerpo JSON. Posible falta de API key.")
+            return {'error': error_msg}
     except requests.exceptions.ConnectionError:
         return {'error': 'Error de conexión con la API'}
     except requests.exceptions.Timeout:
@@ -370,6 +388,250 @@ def check_api_connection(api_url):
     if 'error' in resultado:
         return False
     return resultado.get('status') == 'OK'
+
+# =============================================================================
+# Funciones de eliminacion
+# =============================================================================
+
+def eliminar_personaje(personaje_id, api_url):
+    """
+    Elimina un personaje de la base de datos y actualiza todas las referencias:
+    - Elimina la asociación con participantes.
+    - Pone a NULL los campos de personaje en los matches de rondas.
+    - Actualiza los torneos vía API para poner a NULL los personajes en matches y match_games.
+    - Finalmente elimina el personaje.
+    """
+    personaje = Personaje.query.get(personaje_id)
+    if not personaje:
+        return False, "El personaje no existe."
+
+    # 1. Eliminar asociación con participantes
+    for participante in personaje.participantes:
+        participante.personajes.remove(personaje)
+    db.session.flush()
+
+    # 2. Actualizar matches de rondas (Match)
+    # Lista de todos los campos de personaje en Match
+    campos_personaje = [
+        'personaje1r1_id', 'personaje2r1_id',
+        'personaje1r2_id', 'personaje2r2_id',
+        'personaje1r3_id', 'personaje2r3_id',
+        'personaje1r4_id', 'personaje2r4_id',
+        'personaje1r5_id', 'personaje2r5_id'
+    ]
+    for campo in campos_personaje:
+        # Actualizar todos los matches que tengan ese personaje
+        matches = Match.query.filter(getattr(Match, campo) == personaje_id).all()
+        for match in matches:
+            setattr(match, campo, None)
+    db.session.flush()
+
+    # 3. Actualizar torneos vía API
+    # Obtener todos los torneos
+    torneos = Torneo.query.all()
+    for torneo in torneos:
+        stage_id = torneo.torneo_id_externo
+        # Obtener datos del stage
+        stage_data = api_request('GET', f"{api_url}/stages/{stage_id}")
+        if 'error' in stage_data or not stage_data:
+            continue
+
+        # Buscar el ID del personaje en la API (el mismo ID de la base de datos)
+        # Asumimos que los IDs de personaje son los mismos en la API y en la BD.
+        # Para cada match sin hijos
+        for match in stage_data.get('match', []):
+            if match is None or match.get('child_count', 0) != 0:
+                continue
+            match_id = match['id']
+            # Verificar si el personaje está en opponent1 o opponent2
+            updated = False
+            payload = {}
+            if match.get('opponent1') and match['opponent1'].get('personaje') == personaje_id:
+                payload['opponent1'] = {'personaje': None}
+                updated = True
+            if match.get('opponent2') and match['opponent2'].get('personaje') == personaje_id:
+                if 'opponent1' in payload:
+                    payload['opponent2'] = {'personaje': None}
+                else:
+                    payload['opponent2'] = {'personaje': None}
+                updated = True
+            if updated:
+                # Enviar PUT a /matches/:id/manual
+                resp = api_request('PUT', f"{api_url}/matches/{match_id}/manual", json=payload)
+                if 'error' in resp:
+                    # Log error pero continuamos
+                    current_app.logger.error(f"Error actualizando match {match_id}: {resp['error']}")
+
+        # Para cada match_game (hijos)
+        for game in stage_data.get('match_game', []):
+            if game is None:
+                continue
+            game_id = game['id']
+            updated = False
+            payload = {}
+            if game.get('opponent1') and game['opponent1'].get('personaje') == personaje_id:
+                payload['opponent1'] = {'personaje': None}
+                updated = True
+            if game.get('opponent2') and game['opponent2'].get('personaje') == personaje_id:
+                if 'opponent1' in payload:
+                    payload['opponent2'] = {'personaje': None}
+                else:
+                    payload['opponent2'] = {'personaje': None}
+                updated = True
+            if updated:
+                resp = api_request('PUT', f"{api_url}/match-games/{game_id}/manual", json=payload)
+                if 'error' in resp:
+                    current_app.logger.error(f"Error actualizando match_game {game_id}: {resp['error']}")
+
+    # 4. Eliminar el personaje
+    db.session.delete(personaje)
+    db.session.commit()
+    return True, f"Personaje '{personaje.nombre}' eliminado correctamente."
+
+def eliminar_participante(participante_id, api_url):
+    """
+    Elimina un participante de la base de datos y actualiza todas las referencias:
+    - Desvincula el participante de su usuario (si existe) y cambia el tipo a 'Espectador'.
+    - Pone a NULL las referencias en matches de rondas (jugadores y ganadores).
+    - Actualiza los torneos vía API para poner a NULL los oponentes.
+    - Elimina el participante de la API (DELETE /participants/:id).
+    - Finalmente elimina el participante de la BD.
+    """
+    participante = Participante.query.get(participante_id)
+    if not participante:
+        return False, "El participante no existe."
+
+    # 1. Desvincular del usuario
+    usuario = Usuario.query.filter_by(participante_id=participante_id).first()
+    if usuario:
+        usuario.participante_id = None
+        # Si el usuario era 'Participante', cambiarlo a 'Espectador'
+        if usuario.tipo and usuario.tipo.nombre == 'Participante':
+            tipo_espectador = TipoUsuario.query.filter_by(nombre='Espectador').first()
+            if tipo_espectador:
+                usuario.tipo_id = tipo_espectador.id
+        db.session.flush()
+
+    # 2. Actualizar matches de rondas
+    # Jugadores
+    matches_j1 = Match.query.filter_by(jugador1_id=participante_id).all()
+    for match in matches_j1:
+        match.jugador1_id = None
+    matches_j2 = Match.query.filter_by(jugador2_id=participante_id).all()
+    for match in matches_j2:
+        match.jugador2_id = None
+
+    # Ganadores de match y rondas
+    campos_ganador = ['ganador_match', 'ganador_r1', 'ganador_r2', 'ganador_r3', 'ganador_r4', 'ganador_r5']
+    for campo in campos_ganador:
+        matches = Match.query.filter(getattr(Match, campo) == participante_id).all()
+        for match in matches:
+            setattr(match, campo, None)
+    db.session.flush()
+
+    # 3. Actualizar torneos vía API
+    # Buscar todos los torneos donde este participante haya participado
+    # Primero, obtener los torneos a través de TorneoResultado (si existe)
+    resultados = TorneoResultado.query.filter_by(participante_id=participante_id).all()
+    torneos_ids = set(res.torneo_id for res in resultados)
+    torneos = Torneo.query.filter(Torneo.id.in_(torneos_ids)).all() if torneos_ids else []
+
+    for torneo in torneos:
+        stage_id = torneo.torneo_id_externo
+        stage_data = api_request('GET', f"{api_url}/stages/{stage_id}")
+        if 'error' in stage_data or not stage_data:
+            continue
+
+        # Buscar el participant_id en la API (por nombre)
+        participant_id_api = None
+        for part in stage_data.get('participant', []):
+            if part and part.get('name') == participante.nickname:
+                participant_id_api = part.get('id')
+                break
+        if participant_id_api is None:
+            continue
+
+        # Para cada match sin hijos
+        for match in stage_data.get('match', []):
+            if match is None or match.get('child_count', 0) != 0:
+                continue
+            match_id = match['id']
+            updated = False
+            payload = {}
+            if match.get('opponent1') and match['opponent1'].get('id') == participant_id_api:
+                payload['opponent1'] = None
+                updated = True
+            if match.get('opponent2') and match['opponent2'].get('id') == participant_id_api:
+                payload['opponent2'] = None
+                updated = True
+            if updated:
+                resp = api_request('PUT', f"{api_url}/matches/{match_id}/manual", json=payload)
+                if 'error' in resp:
+                    current_app.logger.error(f"Error actualizando match {match_id}: {resp['error']}")
+
+        # Para cada match_game
+        for game in stage_data.get('match_game', []):
+            if game is None:
+                continue
+            game_id = game['id']
+            updated = False
+            payload = {}
+            if game.get('opponent1') and game['opponent1'].get('id') == participant_id_api:
+                payload['opponent1'] = None
+                updated = True
+            if game.get('opponent2') and game['opponent2'].get('id') == participant_id_api:
+                payload['opponent2'] = None
+                updated = True
+            if updated:
+                resp = api_request('PUT', f"{api_url}/match-games/{game_id}/manual", json=payload)
+                if 'error' in resp:
+                    current_app.logger.error(f"Error actualizando match_game {game_id}: {resp['error']}")
+
+        # Eliminar el participante de la API (DELETE /participants/:id)
+        resp = api_request('DELETE', f"{api_url}/participants/{participant_id_api}")
+        if 'error' in resp:
+            current_app.logger.error(f"Error eliminando participante de API: {resp['error']}")
+
+    # 4. Eliminar el participante de la BD
+    db.session.delete(participante)
+    db.session.commit()
+    return True, f"Participante '{participante.nickname}' eliminado correctamente."
+
+def eliminar_usuario(usuario_id, delete_participant=False, current_user_id=None):
+    """
+    Elimina un usuario de la base de datos.
+    - Si delete_participant es True, elimina también el participante asociado (usando eliminar_participante).
+    - Verifica que no sea el único administrador (activo o total) y que no sea el usuario actual.
+    """
+    usuario = Usuario.query.get(usuario_id)
+    if not usuario:
+        return False, "El usuario no existe."
+
+    # Verificar que no sea el usuario actual
+    if current_user_id and usuario.id == current_user_id:
+        return False, "No puedes eliminar tu propia cuenta."
+
+    # Verificar si es administrador y las condiciones de unicidad
+    if usuario.tipo and usuario.tipo.nombre == 'Admin':
+        # Contar otros administradores (activos o totales según corresponda)
+        # Para evitar eliminar al único admin, contamos todos los admins (activos o inactivos)
+        otros_admins = Usuario.query.filter(
+            Usuario.tipo.has(nombre='Admin'),
+            Usuario.id != usuario.id
+        ).count()
+        if otros_admins == 0:
+            return False, "No se puede eliminar al único administrador del sistema."
+
+    # Eliminar participante asociado si se solicita
+    if delete_participant and usuario.participante:
+        ok, msg = eliminar_participante(usuario.participante.id, current_app.config.get('API_TORNEOS_URL'))
+        if not ok:
+            return False, f"Error eliminando participante: {msg}"
+
+    # Eliminar el usuario
+    db.session.delete(usuario)
+    db.session.commit()
+    return True, f"Usuario '{usuario.email}' eliminado correctamente."
 
 def obtener_standings_torneo(torneo, api_url):
     """
