@@ -23,7 +23,6 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 - **Backend**: Python + Flask
 - **Database**: SQLite (with SQLAlchemy)
 - **Frontend**: Bootstrap 5, Tom Select (for enhanced selects)
-- **Task scheduling**: APScheduler
 - **APIs Used**: [Custom-built REST API](https://github.com/juniornff/brackets-manager-server) for the [Drarig29/brackets-manager.js](https://github.com/Drarig29/brackets-manager.js) library
 - **CI/CD**: GitHub Actions, Docker, GitHub Container Registry (ghcr.io)
 
