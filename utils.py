@@ -613,14 +613,15 @@ def eliminar_usuario(usuario_id, delete_participant=False, current_user_id=None)
 
     # Verificar si es administrador y las condiciones de unicidad
     if usuario.tipo and usuario.tipo.nombre == 'Admin':
-        # Contar otros administradores (activos o totales según corresponda)
-        # Para evitar eliminar al único admin, contamos todos los admins (activos o inactivos)
+        # Contar otros administradores activos
+        # Para evitar eliminar al único admin activo, contamos todos los admins activos
         otros_admins = Usuario.query.filter(
             Usuario.tipo.has(nombre='Admin'),
-            Usuario.id != usuario.id
+            Usuario.id != usuario.id,
+            Usuario.activo == True
         ).count()
         if otros_admins == 0:
-            return False, "No se puede eliminar al único administrador del sistema."
+            return False, "No se puede eliminar al único administrador activo del sistema."
 
     # Eliminar participante asociado si se solicita
     if delete_participant and usuario.participante:
