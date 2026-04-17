@@ -62,10 +62,11 @@ utils.init_db(app)
 
 with app.app_context():
     app.logger.info(f"Intentando Conexión con API con el URL {API_TORNEOS_URL}...")
-    if utils.check_api_connection(API_TORNEOS_URL):
+    ok, error_code = utils.check_api_connection(API_TORNEOS_URL)
+    if ok:
         app.logger.info("Conexión con API de torneos establecida correctamente.")
     else:
-        app.logger.warning("No se pudo conectar con la API de torneos. Algunas funciones pueden no estar disponibles.")
+        app.logger.warning("No se pudo conectar correctamente con la API de torneos. Algunas funciones pueden no estar disponibles.")
 
 # =============================================================================
 # Filtros y Context Processors

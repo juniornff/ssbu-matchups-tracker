@@ -386,7 +386,10 @@ def check_api_connection(api_url):
     """
     resultado = api_request('GET', f"{api_url}/health")
     if 'error' in resultado:
-        return False
+        return False, 1
+    resultado_api = api_request('GET', f"{api_url}/tournaments")
+    if 'error' in resultado_api:
+        return False, 2
     return resultado.get('status') == 'OK'
 
 # =============================================================================
