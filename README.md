@@ -28,6 +28,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
 
 ## Future Plans
 
+- **Restructure the project** Implement a Blueprints and Services framework. This will make the project easier to maintain and expand. In addition to allowing the implementation of isolated tests.
 - **MySQL Database Integration:** Enable the option to use MySQL as a database alternative to SQLite.
 - **External User Authentication Methods:** Implement a secure user login methods (e.g., OAuth) to ensure an easier and safer way to access the application.
 
@@ -64,7 +65,7 @@ Web application to organize and manage **Super Smash Bros Ultimate** meetups and
         - ./data:/app/data
         environment:
         - API_KEY=${API_KEY}
-        - DATA_FILE=data/db.json
+        - DATA_FILE=db.json
         - VERBOSE=false
         networks:
         - smash-net
@@ -204,17 +205,14 @@ If you prefer to run the application directly on your system without Docker, fol
 
     **On Linux / Mac:**
     ```bash
-    export SECRET_KEY="your_flask_secret_key"
     export API_TORNEOS_URL="http://localhost:3000"  # adjust if your API runs elsewhere
     ```
 
     **On Windows:**
     ```bash
     # Command Prompt
-    set SECRET_KEY=your_flask_secret_key
     set API_TORNEOS_URL=http://localhost:3000
     # PowerShell
-    $env:SECRET_KEY="your_flask_secret_key"
     $env:API_TORNEOS_URL="http://localhost:3000"
     ```
     If you do not provide these variables, the application will automatically generate random values on startup and log them for reference.
